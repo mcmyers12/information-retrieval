@@ -23,11 +23,23 @@ public class CorpusStatistics {
 	private int collectionSize = 0; // Total number of words encountered
 	private int numWordsInOneDocument = 0; // Number of words that occur in exactly one document
 	
-	private HashMap<String, Term> lexicon = new LinkedHashMap<>();
+	private Map<String, Term> lexicon = new HashMap<>();
 
 	private class Term {
-		private int collectionFrequency = 1; // Number of times term is seen
-		private int documentFrequency = 1; // Number of documents which the word occurs in
+		private int collectionFrequency = 0; // Number of times term is seen
+		private int documentFrequency = 0; // Number of documents which the word occurs in
+		
+		public void incrementCollectionFrequency() {
+			collectionFrequency++;
+		}
+
+		public void incrementDocumentFrequency() {
+			documentFrequency++;
+		}
+		
+		public String toString() {
+			return "collection frequency: " + collectionFrequency + ", document frequency: " + documentFrequency;
+		}
 	}
 
 	private void readFile(String fileName) {
@@ -49,7 +61,7 @@ public class CorpusStatistics {
 					
 					while (currentLine != null && !currentLine.startsWith("</P>")) {
 						String[] tokens = tokenize(currentLine);
-						
+						System.out.println("line: " + currentLine);
 						for (String token : tokens) {
 							collectionSize++;
 							
@@ -58,7 +70,9 @@ public class CorpusStatistics {
 								lexicon.get(token).collectionFrequency++; // Increment number of times term is seen
 							}
 							else {
-								lexicon.put(token, new Term());
+								Term term = new Term();
+								term.collectionFrequency++;
+								lexicon.put(token, term);
 							}
 						}
 						
@@ -66,7 +80,7 @@ public class CorpusStatistics {
 					}
 					
 					for (String token : tokensInDocument) {
-						lexicon.get(token).documentFrequency++; // Increment number of documents each token occurs in
+						lexicon.get(token).incrementDocumentFrequency(); // Increment number of documents each token occurs in
 					}
 					
 				}
@@ -98,9 +112,6 @@ public class CorpusStatistics {
 		for (Term term : lexicon.values()) {
 			if (term.documentFrequency == 1) {
 				numWordsInOneDocument++;
-			}
-			else {
-				return;
 			}
 		}
 	}
