@@ -1,16 +1,13 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
 public class CorpusStatistics {
@@ -24,21 +21,15 @@ public class CorpusStatistics {
 	private int numWordsInOneDocument = 0; // Number of words that occur in exactly one document
 	
 	private Map<String, Term> lexicon = new HashMap<>();
+	private List<Term> terms;
 
 	private class Term {
+		private String text;
 		private int collectionFrequency = 0; // Number of times term is seen
 		private int documentFrequency = 0; // Number of documents which the word occurs in
 		
-		public void incrementCollectionFrequency() {
-			collectionFrequency++;
-		}
-
-		public void incrementDocumentFrequency() {
-			documentFrequency++;
-		}
-		
 		public String toString() {
-			return "collection frequency: " + collectionFrequency + ", document frequency: " + documentFrequency;
+			return text + "\t\t - collection frequency: " + collectionFrequency + ", document frequency: " + documentFrequency;
 		}
 	}
 
@@ -52,7 +43,7 @@ public class CorpusStatistics {
 			String currentLine;
 
 			int count = 0;
-			while ((currentLine = bufferedReader.readLine()) != null && count < 3) {
+			while ((currentLine = bufferedReader.readLine()) != null) { //) && count < 3) {
 				if (currentLine.startsWith("<P ID=")) { // The start of a new document (paragraph)
 					count ++;
 					numDocuments++;
@@ -61,7 +52,7 @@ public class CorpusStatistics {
 					
 					while (currentLine != null && !currentLine.startsWith("</P>")) {
 						String[] tokens = tokenize(currentLine);
-						System.out.println("line: " + currentLine);
+						
 						for (String token : tokens) {
 							collectionSize++;
 							
@@ -71,6 +62,7 @@ public class CorpusStatistics {
 							}
 							else {
 								Term term = new Term();
+								term.text = token;
 								term.collectionFrequency++;
 								lexicon.put(token, term);
 							}
@@ -80,7 +72,7 @@ public class CorpusStatistics {
 					}
 					
 					for (String token : tokensInDocument) {
-						lexicon.get(token).incrementDocumentFrequency(); // Increment number of documents each token occurs in
+						lexicon.get(token).documentFrequency++; // Increment number of documents each token occurs in
 					}
 					
 				}
@@ -88,7 +80,7 @@ public class CorpusStatistics {
 			
 			vocabularySize = lexicon.keySet().size();
 			
-			sortLexicon();
+			getSortedTermList();
 			calculateNumWordsInOneDocument();
 			
 		} catch (IOException e) {
@@ -109,15 +101,15 @@ public class CorpusStatistics {
 	
 	//Assumes sorted lexicon
 	private void calculateNumWordsInOneDocument() {
-		for (Term term : lexicon.values()) {
+		for (Term term : terms) {
 			if (term.documentFrequency == 1) {
 				numWordsInOneDocument++;
 			}
 		}
 	}
 	
-	private void sortLexicon() { 
-	   List<Entry<String, Term>> list = new LinkedList<Entry<String, Term>>(lexicon.entrySet());
+	private void getSortedTermList() { 
+	   /*List<Entry<String, Term>> list = new LinkedList<Entry<String, Term>>(lexicon.entrySet());
 	   // Defined Custom Comparator here
 	   Collections.sort(list, new Comparator<Entry<String, Term>>() {
 	        public int compare(Entry<String, Term> o1, Entry<String, Term> o2) {
@@ -125,7 +117,7 @@ public class CorpusStatistics {
 	              .compareTo(((Map.Entry<String, Term>) (o2)).getValue().collectionFrequency);
 	        }
 	   });
-	
+	   
 	   // Here I am copying the sorted list in HashMap
 	   // using LinkedHashMap to preserve the insertion order
 	   HashMap<String, Term> sortedHashMap = new LinkedHashMap<>();
@@ -134,14 +126,29 @@ public class CorpusStatistics {
 	          sortedHashMap.put(entry.getKey(), entry.getValue());
 	   } 
 	   lexicon = sortedHashMap;
+	   terms = new ArrayList<Term>(sortedHashMap.values());*/
+	   
+	   
+	   terms = new ArrayList<Term>(lexicon.values());
+	   
+	   Collections.sort(terms, new Comparator<Term>() {
+		   public int compare(Term term1, Term term2) {
+				return term1.collectionFrequency > term2.collectionFrequency ? -1: (term1.collectionFrequency < term2.collectionFrequency ? 1 : 0);
+			}
+	   });
+	
 	  }
 	
 	private void printResults() {
-		for (Entry<String, Term> entry : lexicon.entrySet()) {
+		/*for (Entry<String, Term> entry : lexicon.entrySet()) {
 			System.out.println(entry.getKey());
 			System.out.println("\tcollectionFrequency: " + entry.getValue().collectionFrequency);
 			System.out.println("\tdocumentFrequency: " + entry.getValue().documentFrequency);
-		}
+		}*/
+		
+		/*for (Term term: terms) {
+			System.out.println(term);
+		}*/
 		
 		System.out.println("\n\n\nNumber of documents (paragraphs) processed");
 		System.out.println("\t" + numDocuments);
@@ -151,6 +158,23 @@ public class CorpusStatistics {
 		System.out.println("\t" + collectionSize);
 		System.out.println("\nNumber of words uccuring in exactly one document");
 		System.out.println("\t" + numWordsInOneDocument);
+		
+		System.out.println("\nMost frequent words");
+		int count = 0;
+		for (Term term : terms) {
+			if (count == 30) {
+				break;
+			}
+			System.out.println("\t" + count++ + ".\t" + term);
+		}
+		System.out.println("\t100.\t" + terms.get(99));
+		System.out.println("\t500.\t" + terms.get(499));
+		System.out.println("\t1000.\t" + terms.get(999));
+		
+		
+		System.out.println();
+		System.out.println();
+		
 	}
 
 	/**
@@ -161,11 +185,9 @@ public class CorpusStatistics {
 	 * @return
 	 */
 	private String[] tokenize(String line) {
-		String[] tokens = line.split("\\s");
+		String[] tokens = line.split("\\s+"); // Split string on whitespace
 		for (int i = 0; i < tokens.length; i++) {
-			if (!tokens[i].toUpperCase().equals(tokens[i])) {
-				tokens[i] = tokens[i].toLowerCase();
-			}
+			tokens[i] = tokens[i].toLowerCase();
 			tokens[i] = tokens[i].replaceFirst("^[^a-zA-Z]+", "");
 			tokens[i] = tokens[i].replaceAll("[^a-zA-Z]+$", "");
 		}
@@ -178,7 +200,7 @@ public class CorpusStatistics {
 	// Test program on two text files
 	public static void main(String[] args) {
 		CorpusStatistics corpusStatistics = new CorpusStatistics();
-		corpusStatistics.readFile(CorpusStatistics.BIBLE_FILE);
+		corpusStatistics.readFile(CorpusStatistics.LES_MIS_FILE);
 		corpusStatistics.printResults();
 	}
 
