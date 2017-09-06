@@ -10,6 +10,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * This class computes a variety of statistics on a given file
+ * Paragraphs in the file are considered to be documents for the purposes of the calculations
+ * Statistics computed:
+ * 	Number of documents processed
+ * 	Number of unique words
+ * 	Collection frequency of each term
+ * 	Document frequency of each term
+ * 	Most frequent words by collection frequency
+ * 	Number of words that occur in exactly one document
+ *
+ * @author Miranda Myers
+ *
+ */
 public class CorpusStatistics {
 
 	private String fileName; // Name of file on which to calculate corpus statistics
@@ -17,15 +31,17 @@ public class CorpusStatistics {
 	private int vocabularySize = 0; // Number of unique words observed
 	private int collectionSize = 0; // Total number of words encountered
 	private int numWordsInOneDocument = 0; // Number of words that occur in exactly one document
-
-	private Map<String, Term> lexicon = new HashMap<>();
-	private List<Term> terms;
+	private Map<String, Term> lexicon = new HashMap<>();  // Lexicon that will hold all terms
+	private List<Term> terms; // List of terms that will contain all terms sorted by collection frequency
 
 
 	public CorpusStatistics(String fileName) {
 		this.fileName = fileName;
 	}
 
+	/**
+	 * Class representing a term that is used to build the lexicon and list of terms
+	 */
 	private class Term {
 		private String text;
 		private int collectionFrequency = 0; // Number of times term is seen
@@ -33,11 +49,16 @@ public class CorpusStatistics {
 
 		@Override
 		public String toString() {
-			return text + "\t\t - collection frequency: " + collectionFrequency + ", document frequency: " + documentFrequency;
+			return text + "\t\t - collection frequency: " + collectionFrequency
+					+ ", document frequency: " + documentFrequency;
 		}
 	}
 
-	private void getDocumentStatistics() {
+	/**
+	 * Build lexicon and term list
+	 * Calculate statistics
+	 */
+	public void computeStatistics() {
 		FileReader fileReader = null;
 		BufferedReader bufferedReader = null;
 		try {
@@ -45,9 +66,6 @@ public class CorpusStatistics {
 			bufferedReader = new BufferedReader(fileReader);
 
 			buildLexicon(bufferedReader);
-
-			vocabularySize = lexicon.keySet().size();
-
 			getSortedTermList();
 			calculateNumWordsInOneDocument();
 
@@ -67,9 +85,14 @@ public class CorpusStatistics {
 		}
 	}
 
+	/**
+	 * Build the lexicon of terms
+	 * @param bufferedReader
+	 * @throws IOException
+	 */
 	private void buildLexicon(BufferedReader bufferedReader) throws IOException {
 		String currentLine;
-		while ((currentLine = bufferedReader.readLine()) != null) { //) && count < 3) {
+		while ((currentLine = bufferedReader.readLine()) != null) {
 			if (currentLine.startsWith("<P ID=")) { // The start of a new document (paragraph)
 				numDocuments++;
 				currentLine = bufferedReader.readLine();
@@ -99,22 +122,26 @@ public class CorpusStatistics {
 				for (String token : tokensInDocument) {
 					lexicon.get(token).documentFrequency++; // Increment number of documents each token occurs in
 				}
-
 			}
 		}
+
+		vocabularySize = lexicon.keySet().size();
 	}
 
 	/**
-	 * Split on spaces, Lower case only if not all upper case, Remove leading
-	 * and trailing punctuation from each token
+	 * Split on spaces
+	 * Lower case only if not all upper case
+	 * Remove leading and trailing punctuation from each token
 	 *
 	 * @param line
-	 * @return
+	 * @return list of tokens
 	 */
 	private String[] tokenize(String line) {
 		String[] tokens = line.split("\\s+"); // Split string on whitespace
 		for (int i = 0; i < tokens.length; i++) {
 			tokens[i] = tokens[i].toLowerCase();
+
+			//Remove internal punctuation
 			tokens[i] = tokens[i].replaceFirst("^[^a-zA-Z]+", "");
 			tokens[i] = tokens[i].replaceAll("[^a-zA-Z]+$", "");
 		}
@@ -122,18 +149,24 @@ public class CorpusStatistics {
 		return tokens;
 	}
 
+	/**
+	 * Using the lexicon, creates a list of terms sorted by collection frequency in descending order
+	 */
 	private void getSortedTermList() {
 		terms = new ArrayList<Term>(lexicon.values());
 
 		Collections.sort(terms, new Comparator<Term>() {
 			@Override
 			public int compare(Term term1, Term term2) {
-				return term1.collectionFrequency > term2.collectionFrequency ? -1: (term1.collectionFrequency < term2.collectionFrequency ? 1 : 0);
+				return term1.collectionFrequency > term2.collectionFrequency ? -1:
+					(term1.collectionFrequency < term2.collectionFrequency ? 1 : 0);
 			}
 		});
 	}
 
-	//Assumes sorted lexicon
+	/**
+	 * Calculate the number of terms that occur in exactly one document
+	 */
 	private void calculateNumWordsInOneDocument() {
 		for (Term term : terms) {
 			if (term.documentFrequency == 1) {
@@ -142,7 +175,10 @@ public class CorpusStatistics {
 		}
 	}
 
-	private void printResults() {
+	/**
+	 * Print the results for all of the computed statistics
+	 */
+	public void printResults() {
 		System.out.println("---------------------------------" + "Statistics for file " + fileName + "---------------------------------");
 		System.out.println("\nNumber of documents (paragraphs) processed");
 		System.out.println("\t" + numDocuments);
@@ -150,7 +186,7 @@ public class CorpusStatistics {
 		System.out.println("\t" + vocabularySize);
 		System.out.println("\nCollection size (total number of words encountered)");
 		System.out.println("\t" + collectionSize);
-		System.out.println("\nNumber of words uccuring in exactly one document");
+		System.out.println("\nNumber of words occurring in exactly one document");
 		System.out.println("\t" + numWordsInOneDocument);
 
 		System.out.println("\nMost frequent words");
@@ -165,21 +201,17 @@ public class CorpusStatistics {
 		System.out.println("\t500.\t" + terms.get(499));
 		System.out.println("\t1000.\t" + terms.get(999) + "\n\n");
 		System.out.println("---------------------------------------------------------------------------------------------------\n\n");
-
 	}
 
-	// Calculate document frequency: number of documents a term appears in
-	// Calculate collection frequency: number of times the word appears
-	// Test program on two text files
 	public static void main(String[] args) {
 		CorpusStatistics bibleCorpusStatistics = new CorpusStatistics("bible-asv.txt");
-
-		bibleCorpusStatistics.getDocumentStatistics();
+		bibleCorpusStatistics.computeStatistics();
 		bibleCorpusStatistics.printResults();
 
 		CorpusStatistics lesMisCorpusStatistics = new CorpusStatistics("lesmis.txt");
-		lesMisCorpusStatistics.getDocumentStatistics();
+		lesMisCorpusStatistics.computeStatistics();
 		lesMisCorpusStatistics.printResults();
 	}
-
 }
+
+
