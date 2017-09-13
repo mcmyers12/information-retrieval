@@ -2,10 +2,12 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.TreeMap;
 
 /**
@@ -19,11 +21,12 @@ import java.util.TreeMap;
  *
  */
 public class InvertedFile {
-	private String fileName; // Name of file for which to create inverted file
+	private String fileName; // Name of input file for which to create inverted file
 	private Map<String, Term> lexicon = new HashMap<>();  // Lexicon that will hold all terms
 	private Map<String, List<InvertedFileRecord>> invertedFileRecords = new TreeMap<>();	// Map containing each inverted file record sorted by term, then docId
 	private File invertedBinaryFile = new File("inverted-file.bin");
 	private File dictionaryFile = new File("dictionary.ser");
+	private final int INT_SIZE = 4;
 
 	public InvertedFile(String fileName) {
 		this.fileName = fileName;
@@ -126,8 +129,13 @@ public class InvertedFile {
 	 */
 	private void buildLexicon(BufferedReader bufferedReader) throws IOException {
 		String currentLine;
-		while ((currentLine = bufferedReader.readLine()) != null) {
+
+		int ct = 0;
+		while ((currentLine = bufferedReader.readLine()) != null && ct < 3) {
 			if (currentLine.startsWith("<P ID=")) { // The start of a new document (paragraph)
+
+				ct++;
+
 				int documentId = Integer.parseInt(currentLine.replace("<P ID=", "").replace(">", ""));
 
 				currentLine = bufferedReader.readLine();
@@ -179,8 +187,41 @@ public class InvertedFile {
 	 * Write to a binary file using 4-byte integers for document ids
 	 * and 4-byte integers for document term frequency
 	 * Also suggested to store the length of the postings list (ie. document frequency) with other info in dictionary data structure
+	 * @throws IOException
 	 */
 	public void writeToBinaryFile() {
+		RandomAccessFile randomAccessFile = null;
+		try {
+			randomAccessFile = new RandomAccessFile(invertedBinaryFile, "rw"); // Open inverted binary file for writing
+			int filePointer = 0;
+			for (Entry<String, List<InvertedFileRecord>> invertedFileRecordsEntry: invertedFileRecords.entrySet()) {
+				String token = invertedFileRecordsEntry.getKey();
+				List<InvertedFileRecord> invertedFileRecordList = invertedFileRecordsEntry.getValue();
+
+				lexicon.get(token).invertedFileLocation = filePointer;
+
+				for (InvertedFileRecord invertedFileRecord : invertedFileRecordList) {
+					randomAccessFile.writeInt(invertedFileRecord.documentId);
+					filePointer += INT_SIZE;
+
+					randomAccessFile.writeInt(invertedFileRecord.count);
+					filePointer += INT_SIZE;
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		finally {
+			try {
+				if (randomAccessFile != null) {
+					randomAccessFile.close();
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+
+
 
 	}
 
@@ -188,19 +229,41 @@ public class InvertedFile {
 	 * Read the binary file after creating the index
 	 * Print out the document frequency and posting list for terms: study, plutonium, Rome, Athens, feasts
 	 * Print out the document frequency for words horse, lovingkindness, Mary, dance
+	 * @throws IOException
 	 */
-	public void readBinaryFileTest() {
+	public void readInvertedIndex(String token) throws IOException {
+		RandomAccessFile randomAccessFile = new RandomAccessFile(invertedBinaryFile, "r");
+
+		System.out.println(token);
+		int documentFrequency = lexicon.get(token).documentFrequency * 2;  // The number of integers stored for the token
+
+		int filePointer = lexicon.get(token).invertedFileLocation;
+
+		for (int i = 0; i < documentFrequency; i++) {
+			randomAccessFile.seek(filePointer);
+			int readInt = randomAccessFile.readInt();
+			System.out.println(readInt);
+
+			filePointer += INT_SIZE;
+		}
+
 
 	}
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException {
 		InvertedFile invertedFile = new InvertedFile("bible-asv.txt");
 		invertedFile.buildLexicon();
+		invertedFile.writeToBinaryFile();
 
-		for (Map.Entry<String, List<InvertedFileRecord>> entry : invertedFile.invertedFileRecords.entrySet()) {
-
-			System.out.println(entry);
+		//		for (Map.Entry<String, List<InvertedFileRecord>> entry : invertedFile.invertedFileRecords.entrySet()) {
+		//			System.out.println(entry);
+		//		}
+		for (List<InvertedFileRecord> ifr : invertedFile.invertedFileRecords.values()) {
+			System.out.println(ifr);
 		}
+
+
+		invertedFile.readInvertedIndex("and");
 	}
 }
 
