@@ -1,0 +1,6 @@
+<Q ID=1>
+bird
+cat
+dog
+</Q>
+
