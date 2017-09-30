@@ -164,34 +164,6 @@ public class InvertedFileAccessor {
 
 
 	/**
-	 * Tokenize a given string using the following approaches
-	 * Split on spaces
-	 * Lower case only if not all upper case
-	 * Remove leading and trailing punctuation from each token
-	 *
-	 * @param line
-	 * @return list of tokens
-	 */
-	private List<String> tokenize(String line) {
-		String[] tokens = line.split("\\s+"); // Split string on whitespace
-		List<String> normalizedTokens = new ArrayList<>();
-		for (String token : tokens) {
-			String normalizedToken = token.toLowerCase();
-
-			//Remove external punctuation
-			normalizedToken = normalizedToken.replaceFirst("^[^a-zA-Z]+", "");
-			normalizedToken = normalizedToken.replaceAll("[^a-zA-Z]+$", "");
-
-			if (!normalizedToken.equals("")) {
-				normalizedTokens.add(normalizedToken);
-			}
-		}
-
-		return normalizedTokens;
-	}
-
-
-	/**
 	 * Read the input file and build the corresponding lexicon
 	 */
 	public void buildLexicon() {
@@ -241,7 +213,7 @@ public class InvertedFileAccessor {
 				Map<String, Integer> tokensInDocument = new HashMap<>();
 
 				while (currentLine != null && !currentLine.startsWith("</P>")) {
-					List<String> tokens = tokenize(currentLine);
+					List<String> tokens = ParsingUtil.tokenize(currentLine);
 
 					for (String token : tokens) {
 						collectionSize++;

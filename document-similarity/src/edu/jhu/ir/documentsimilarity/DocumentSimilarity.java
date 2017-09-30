@@ -1,7 +1,10 @@
 package edu.jhu.ir.documentsimilarity;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import edu.jhu.ir.documentsimilarity.InvertedFileAccessor.Term;
@@ -28,12 +31,15 @@ public class DocumentSimilarity {
 
 	private Map<Integer, Document> documents = new HashMap<>();	//Map of document ID to document object
 	private Map<String, Term> lexicon = new HashMap<>();  // Lexicon that will hold all terms
+	private Map<Integer, Query> querySet = new HashMap<>();
 
 	private String inputFileName;
+	private String queryFileName;
 	private InvertedFileAccessor invertedFileAccessor;
 
-	public DocumentSimilarity(String inputFileName) {
+	public DocumentSimilarity(String inputFileName, String queryFileName) {
 		this.inputFileName = inputFileName;
+		this.queryFileName = queryFileName;
 		invertedFileAccessor = new InvertedFileAccessor(inputFileName);
 		lexicon = invertedFileAccessor.getLexiconFromDisk();
 	}
@@ -43,20 +49,84 @@ public class DocumentSimilarity {
 		private Map<Integer, Float> scores; //Map of query ID to document score for that query
 	}
 
+	private class Query {
+		private Map<String, Integer> bagOfWords = new HashMap<>();
+	}
+
 
 	public void computeDocumentVectorLengths() {
 
 	}
+
 
 	/**
 	 * Processes given file containing a set of queries
 	 * Creates a bag of words representation for each query
 	 *     B.O.W.: list of strings (terms) and weights (counts)
 	 */
-	public void processQuerySet() {
+	public void processQueryFile() {
+		FileReader fileReader = null;
+		BufferedReader bufferedReader = null;
+		try {
+			fileReader = new FileReader(queryFileName);
+			bufferedReader = new BufferedReader(fileReader);
 
+			buildQuerySet(bufferedReader);
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				if (bufferedReader != null) {
+					bufferedReader.close();
+				}
+				if (fileReader != null) {
+					fileReader.close();
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
+	private void buildQuerySet(BufferedReader bufferedReader) throws IOException {
+		String currentLine;
+
+		while ((currentLine = bufferedReader.readLine()) != null) {
+			if (currentLine.startsWith("<Q ID=")) { // The start of a new query
+				int queryId = Integer.parseInt(currentLine.replace("<Q ID=", "").replace(">", ""));
+				querySet.put(queryId, new Query());
+
+				currentLine = bufferedReader.readLine();
+				Map<String, Integer> tokensInQuery = new HashMap<>();
+
+				while (currentLine != null && !currentLine.startsWith("</Q>")) {
+					List<String> tokens = ParsingUtil.tokenize(currentLine);
+
+					for (String token : tokens) {
+						if (tokensInQuery.containsKey(token)) {
+							int count = tokensInQuery.get(token).intValue();
+							tokensInQuery.put(token, ++count);
+						}
+						else {
+							tokensInQuery.put(token, 1);
+						}
+					}
+
+					currentLine = bufferedReader.readLine();
+				}
+				querySet.get(queryId).bagOfWords = tokensInQuery;
+			}
+		}
+
+		for (Map.Entry<Integer, Query> entry : querySet.entrySet()) {
+			System.out.println(entry.getKey());
+			for (Map.Entry<String, Integer> bowEntry : entry.getValue().bagOfWords.entrySet()) {
+				System.out.println("\t" + bowEntry.getKey() + " " + bowEntry.getValue());
+			}
+			System.out.println();
+		}
+	}
 
 	/**
 	 * Prints the query vector for the first query in the given set of queries
@@ -76,10 +146,11 @@ public class DocumentSimilarity {
 
 	public void test() throws IOException {
 		invertedFileAccessor.prettyPrintList(invertedFileAccessor.readInvertedIndex("sleep"));
+		processQueryFile();
 	}
 
 	public static void main(String[] args) throws IOException {
-		DocumentSimilarity documentSimilarity = new DocumentSimilarity("fire10TEST.en.utf8");
+		DocumentSimilarity documentSimilarity = new DocumentSimilarity("fire10TEST.en.utf8", "fire10.topics.en.utf8");
 		documentSimilarity.test();
 	}
 }
