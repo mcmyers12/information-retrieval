@@ -12,13 +12,16 @@ import java.io.ObjectInput;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.RandomAccessFile;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
+
+import edu.jhu.ir.documentsimilarity.IRUtil.Document;
+import edu.jhu.ir.documentsimilarity.IRUtil.InvertedFileRecord;
+import edu.jhu.ir.documentsimilarity.IRUtil.Term;
 
 /**
  * This class builds an inverted file that contains a postings list for each dictionary term
@@ -41,6 +44,7 @@ public class InvertedFileAccessor {
 	private int collectionSize = 0; // Total number of words encountered
 	private Map<String, Term> lexicon = new HashMap<>();  // Lexicon that will hold all terms
 	private Map<String, List<InvertedFileRecord>> invertedFileRecords = new TreeMap<>();	// Map containing each inverted file record sorted by term, then docId
+	private Map<Integer, Document> documents = new HashMap<>();	//Map of document ID to document object
 
 
 	/**
@@ -63,6 +67,12 @@ public class InvertedFileAccessor {
 			e.printStackTrace();
 		}
 	}
+
+
+	public int getNumDocuments() {
+		return numDocuments;
+	}
+
 
 	@SuppressWarnings("unchecked")
 	public Map<String, Term> getLexiconFromDisk() {
@@ -90,6 +100,7 @@ public class InvertedFileAccessor {
 		return null;
 	}
 
+
 	/**
 	 * Given a token, access the corresponding records for that token in the inverted file
 	 * Return a list of InvertedFileRecord objects that contain the postings list and
@@ -103,9 +114,9 @@ public class InvertedFileAccessor {
 		Term term = lexicon.get(token);
 
 		if (term != null) {
-			int documentFrequency = term.documentFrequency * 2;  // The number of integers stored for the token
+			int documentFrequency = term.getDocumentFrequency() * 2;  // The number of integers stored for the token
 
-			int filePointer = term.invertedFileLocation;
+			int filePointer = term.getInvertedFileLocation();
 
 			for (int i = 0; i < documentFrequency; i+=2) {
 				randomAccessFile.seek(filePointer);
@@ -121,45 +132,6 @@ public class InvertedFileAccessor {
 		}
 		randomAccessFile.close();
 		return invertedFileRecordList;
-	}
-
-
-	/**
-	 * Class representing a term that is used to build the lexicon and list of terms
-	 */
-	public static class Term implements Serializable {
-		private static final long serialVersionUID = -1947264671039701464L;
-		private String text;	//Required in memory
-		private int invertedFileLocation;	//Required in memory
-
-		private int documentFrequency = 0; // Number of documents which the word occurs in	// Useful in memory
-
-		@Override
-		public String toString() {
-			return text + "\t\t - document frequency: " + documentFrequency;
-		}
-	}
-
-
-	/**
-	 * Class representing an inverted file record that stores the document ID and
-	 * count for the number of times a term appears in that document
-	 * This class is used to hold the information that is stored to the inverted file
-	 */
-	private class InvertedFileRecord {
-		private int documentId;
-		private int count;
-
-		public InvertedFileRecord(int documentId, int count) {
-			this.documentId = documentId;
-			this.count = count;
-		}
-
-		@Override
-		public String toString() {
-			return "(documentID: " + documentId
-					+ ", count: " + count + ")";
-		}
 	}
 
 
@@ -208,12 +180,13 @@ public class InvertedFileAccessor {
 			if (currentLine.startsWith("<P ID=")) { // The start of a new document (paragraph)
 				numDocuments++;
 				int documentId = Integer.parseInt(currentLine.replace("<P ID=", "").replace(">", ""));
+				Document document = new Document(documentId);
 
 				currentLine = bufferedReader.readLine();
 				Map<String, Integer> tokensInDocument = new HashMap<>();
 
 				while (currentLine != null && !currentLine.startsWith("</P>")) {
-					List<String> tokens = ParsingUtil.tokenize(currentLine);
+					List<String> tokens = IRUtil.tokenize(currentLine);
 
 					for (String token : tokens) {
 						collectionSize++;
@@ -232,12 +205,15 @@ public class InvertedFileAccessor {
 
 				for (String token : tokensInDocument.keySet()) {
 					if (lexicon.containsKey(token)) {
-						lexicon.get(token).documentFrequency++; // Increment number of documents each token occurs in
+						Term term = lexicon.get(token);
+						int documentFrequency = term.getDocumentFrequency();
+						term.setDocumentFrequency(++documentFrequency); // Increment number of documents each token occurs in
 					}
 					else {
 						Term term = new Term();
-						term.text = token;
-						term.documentFrequency++;
+						term.setText(token);
+						int documentFrequency = term.getDocumentFrequency();
+						term.setDocumentFrequency(++documentFrequency);
 						lexicon.put(token, term);
 					}
 
@@ -267,13 +243,13 @@ public class InvertedFileAccessor {
 				String token = invertedFileRecordsEntry.getKey();
 				List<InvertedFileRecord> invertedFileRecordList = invertedFileRecordsEntry.getValue();
 
-				lexicon.get(token).invertedFileLocation = filePointer;
+				lexicon.get(token).setInvertedFileLocation(filePointer);
 
 				for (InvertedFileRecord invertedFileRecord : invertedFileRecordList) {
-					randomAccessFile.writeInt(invertedFileRecord.documentId);
+					randomAccessFile.writeInt(invertedFileRecord.getDocumentId());
 					filePointer += INT_SIZE;
 
-					randomAccessFile.writeInt(invertedFileRecord.count);
+					randomAccessFile.writeInt(invertedFileRecord.getTermFrequency());
 					filePointer += INT_SIZE;
 				}
 			}
@@ -398,8 +374,8 @@ public class InvertedFileAccessor {
 		prettyPrintList(readInvertedIndex("a"));
 
 		System.out.println("\nExample document frequencies:");
-		System.out.println("  a\n\t" + lexicon.get("a").documentFrequency);
-		System.out.println("  the\n\t" + lexicon.get("the").documentFrequency);
+		System.out.println("  a\n\t" + lexicon.get("a").getDocumentFrequency());
+		System.out.println("  the\n\t" + lexicon.get("the").getDocumentFrequency());
 	}
 
 

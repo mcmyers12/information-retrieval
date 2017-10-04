@@ -7,7 +7,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import edu.jhu.ir.documentsimilarity.InvertedFileAccessor.Term;
+import edu.jhu.ir.documentsimilarity.IRUtil.Document;
+import edu.jhu.ir.documentsimilarity.IRUtil.InvertedFileRecord;
+import edu.jhu.ir.documentsimilarity.IRUtil.Term;
+
 
 
 /**
@@ -29,10 +32,11 @@ import edu.jhu.ir.documentsimilarity.InvertedFileAccessor.Term;
  */
 public class DocumentSimilarity {
 
+	private Map<Integer, Double> documentVectorLengths = new HashMap<>();
 	private Map<Integer, Document> documents = new HashMap<>();	//Map of document ID to document object
 	private Map<String, Term> lexicon = new HashMap<>();  // Lexicon that will hold all terms
 	private Map<Integer, Query> querySet = new HashMap<>();
-
+	private int numDocuments;
 	private String inputFileName;
 	private String queryFileName;
 	private InvertedFileAccessor invertedFileAccessor;
@@ -42,20 +46,131 @@ public class DocumentSimilarity {
 		this.queryFileName = queryFileName;
 		invertedFileAccessor = new InvertedFileAccessor(inputFileName);
 		lexicon = invertedFileAccessor.getLexiconFromDisk();
-	}
-
-	private class Document {
-		private float vectorLength;
-		private Map<Integer, Float> scores; //Map of query ID to document score for that query
+		numDocuments = invertedFileAccessor.getNumDocuments();
 	}
 
 	private class Query {
 		private Map<String, Integer> bagOfWords = new HashMap<>();
 	}
 
+	//Document frequency is stored in the dictionary	//TODO possibly precompute this???
+	private double getIdf(String term) {
+		int documentFrequency = lexicon.get(term).getDocumentFrequency();
+		double idf = Math.log(numDocuments / documentFrequency);	//Log base 2
+		//IDF = numDocuments / term.documentFrequency
+		return idf;
+	}
 
-	public void computeDocumentVectorLengths() {
 
+	//Square root of sum of squares of all of the term weights in the query
+	private double computeQueryVectorLength(Query query) {
+		double queryVectorLength = 0;
+		for (Map.Entry<String, Integer> entry : query.bagOfWords.entrySet()) {
+			int queryTermFrequency = entry.getValue();
+			String term = entry.getKey();
+			double tfIdf = queryTermFrequency * getIdf(term);	//TODO use TFIDF here or just counts???
+
+			queryVectorLength += tfIdf * tfIdf;
+		}
+		queryVectorLength = Math.sqrt(queryVectorLength);
+
+		return queryVectorLength;
+	}
+
+
+
+	//We return the documents ranked by the closeness of their vectors to the query
+
+	//Put each documentID into a hash table pointing to scores - key: docId, value: score
+	//Scores should be initialized to 0
+
+	//Keep an accumulator of docId -> scores
+	//Cosine scores are computed one term at a time
+	//	Take the first query term, seek into the inverted file to find docIds and term counts
+	//		compute the tf-idf weight, multiply that by the appropriate query term tf-idf,
+	//		add that product (partial dot product) into an accumulator where we are storing the document scores
+	//		As we process more and more terms, the scores for documents will tend to increase
+	//	Only consider terms both in document and query
+	//After all query terms are processed, divide partial dot product by query length * document length
+	//Then, sort the documents by score - heapsort may be best
+
+	//Last part of implementation video discusses options to improve efficiency
+	private void getScores(Query query) throws IOException {
+
+		//For the dot product part of cosine metric, we can use only the terms that are in the query
+		Map<Integer, Double> scoreAccumulator = new HashMap<>(); //Document ID to dot product
+
+		double queryVectorLength = computeQueryVectorLength(query);
+
+		for (String term : query.bagOfWords.keySet()) {
+
+			double queryTfIdf = query.bagOfWords.get(term) * getIdf(term);
+
+			//Get the files that have the query term
+			List<InvertedFileRecord> invertedFileRecords = invertedFileAccessor.readInvertedIndex(term);
+
+			for (InvertedFileRecord invertedFileRecord : invertedFileRecords) {
+				int documentId = invertedFileRecord.getDocumentId();
+				double documentTfIdf = invertedFileRecord.getTermFrequency() * getIdf(term);
+				double partialDotProduct = queryTfIdf * documentTfIdf;
+
+				if (scoreAccumulator.containsKey(documentId)) {
+					double dotProductAccumulator = scoreAccumulator.get(documentId);
+					partialDotProduct += dotProductAccumulator;
+				}
+
+				scoreAccumulator.put(documentId, partialDotProduct);
+			}
+
+			for (int documentId : scoreAccumulator.keySet()) {
+				double dotProduct = scoreAccumulator.get(documentId);
+				double documentVectorLength = documentVectorLengths.get(documentId);
+				double cosineScore = dotProduct / (documentVectorLength * queryVectorLength);
+
+				scoreAccumulator.put(documentId, cosineScore);
+			}
+		}
+	}
+
+
+	//Term frequency is stored in the inverted file
+	//Query vector length can be computed one time and reused to rank the different documents
+	//To compute document length, you need to compute the TF-IDF values for each term in the document
+	//DF is not know for all terms until the last term is seen
+	//
+	//Sum of squares of all of the term weights in the whole document
+	//After all documents have been seen, doc lengths can be computed one term at a time,
+	//	by walking over every entry in the dictionary, look up entry in the inverted file
+	//	calculate TF-IDF, store that squared value stored into an accumulator for each doc ID
+	//A sum of squared weights will then be stored for each document, and after all terms are seen,
+	//	take sqrt
+	public void computeDocumentVectorLengths() throws IOException {
+		Map<Integer, Double> documentTfIdfAccumulator = new HashMap<>();
+		for (String term : lexicon.keySet()) { //Get squared tf-idf weights for all terms in all documents
+			List<InvertedFileRecord> invertedFileRecords = invertedFileAccessor.readInvertedIndex(term);
+			for (InvertedFileRecord invertedFileRecord : invertedFileRecords) {
+				int documentId = invertedFileRecord.getDocumentId();
+				int tf = invertedFileRecord.getTermFrequency();
+				double idf = getIdf(term);
+				double tfIdf = tf * idf;
+
+				double squaredWeights;
+				if (documentTfIdfAccumulator.containsKey(documentId)) { //If this document already has squared weights, add to it
+					squaredWeights = documentTfIdfAccumulator.get(documentId);
+					squaredWeights += tfIdf * tfIdf;
+				}
+				else { //Otherwise initialize the entry in the map with a new squared weight
+					squaredWeights = tfIdf * tfIdf;
+				}
+				documentTfIdfAccumulator.put(documentId, squaredWeights);
+			}
+		}
+
+		for (int documentId : documentTfIdfAccumulator.keySet()) {
+			double squaredWeights = documentTfIdfAccumulator.get(documentId);
+			squaredWeights = Math.sqrt(squaredWeights);
+			documentVectorLengths.put(documentId, squaredWeights);
+		}
 	}
 
 
@@ -101,7 +216,7 @@ public class DocumentSimilarity {
 				Map<String, Integer> tokensInQuery = new HashMap<>();
 
 				while (currentLine != null && !currentLine.startsWith("</Q>")) {
-					List<String> tokens = ParsingUtil.tokenize(currentLine);
+					List<String> tokens = IRUtil.tokenize(currentLine);
 
 					for (String token : tokens) {
 						if (tokensInQuery.containsKey(token)) {
@@ -117,14 +232,6 @@ public class DocumentSimilarity {
 				}
 				querySet.get(queryId).bagOfWords = tokensInQuery;
 			}
-		}
-
-		for (Map.Entry<Integer, Query> entry : querySet.entrySet()) {
-			System.out.println(entry.getKey());
-			for (Map.Entry<String, Integer> bowEntry : entry.getValue().bagOfWords.entrySet()) {
-				System.out.println("\t" + bowEntry.getKey() + " " + bowEntry.getValue());
-			}
-			System.out.println();
 		}
 	}
 
