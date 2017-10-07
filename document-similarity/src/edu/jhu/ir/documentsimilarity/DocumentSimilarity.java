@@ -1,8 +1,10 @@
 package edu.jhu.ir.documentsimilarity;
 
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,13 +37,18 @@ public class DocumentSimilarity {
 	private Map<Integer, Double> documentVectorLengths = new HashMap<>();
 	private Map<String, Term> lexicon = new HashMap<>();  // Lexicon that will hold all terms
 	private Map<Integer, Query> querySet = new LinkedHashMap<>(); //Map of query id to query object that preserves original ordering of queries
+	private boolean useStemming;
 	private int numDocuments;
 	private String queryFileName;
+	private String outputFileName;
 	private InvertedFileAccessor invertedFileAccessor;
+	private double cosineSimilarityRuntime;
 
-	public DocumentSimilarity(String inputFileName, String queryFileName) {
+	public DocumentSimilarity(String inputFileName, String queryFileName, String outputFileName, boolean useStemming) {
+		this.outputFileName = outputFileName;
 		this.queryFileName = queryFileName;
-		invertedFileAccessor = new InvertedFileAccessor(inputFileName);
+		this.useStemming = useStemming;
+		invertedFileAccessor = new InvertedFileAccessor(inputFileName, useStemming);
 		lexicon = invertedFileAccessor.getLexiconFromDisk();
 		numDocuments = invertedFileAccessor.getNumDocuments();
 	}
@@ -60,7 +67,11 @@ public class DocumentSimilarity {
 
 	//Document frequency is stored in the dictionary	//TODO possibly precompute this???
 	private double getIdf(String term) {
-		int documentFrequency = lexicon.get(term).getDocumentFrequency();
+		int documentFrequency = 0;
+		if (lexicon.containsKey(term)) {
+			documentFrequency = lexicon.get(term).getDocumentFrequency();
+		}
+
 		double idf;
 		if (documentFrequency > 0) {
 			idf = Math.log(numDocuments / documentFrequency);	//Log base 2
@@ -87,7 +98,6 @@ public class DocumentSimilarity {
 
 		return queryVectorLength;
 	}
-
 
 
 	//We return the documents ranked by the closeness of their vectors to the query
@@ -147,9 +157,6 @@ public class DocumentSimilarity {
 				}
 
 				scoreAccumulator.put(documentId, cosineScore);
-				//
-				//				System.out.println("documentId: " + documentId);
-				//				System.out.println("cosineScore: " + cosineScore);
 			}
 
 			query.documentScores = scoreAccumulator;
@@ -229,6 +236,7 @@ public class DocumentSimilarity {
 		}
 	}
 
+
 	private void buildQuerySet(BufferedReader bufferedReader) throws IOException {
 		String currentLine;
 
@@ -244,6 +252,12 @@ public class DocumentSimilarity {
 					List<String> tokens = IRUtil.tokenize(currentLine);
 
 					for (String token : tokens) {
+						if (useStemming) {
+							if (token.length() > 5) {
+								token = token.substring(0, 5);
+							}
+						}
+
 						if (tokensInQuery.containsKey(token)) {
 							int count = tokensInQuery.get(token).intValue();
 							tokensInQuery.put(token, ++count);
@@ -260,61 +274,84 @@ public class DocumentSimilarity {
 		}
 	}
 
-	/**
-	 * Prints the query vector for the first query in the given set of queries
-	 * Displays the processed query terms and their weights for topic #76
-	 */
-	public void printFirstQuery() {
-
-	}
 
 	/**
 	 * Produces a single output file containing ranked documents for all topics
 	 * Provides the top 50 ranked documents for each query
 	 * @throws IOException
 	 */
-	public void computeAllScores() throws IOException {
+	private void computeAllScores() throws IOException {
 		processQueryFile();
 		computeDocumentVectorLengths();
 		for (Query query : querySet.values()) { //TODO make sure this is processed in query order
 			computeQueryScores(query);
-
-			int rank = 1;
-			for (Map.Entry<Integer, Double> score : query.documentScores.entrySet()) {
-				System.out.println(query.id + " Q0 " + score.getKey() + " " + rank + " " + score.getValue());
-				if (rank == 50) {
-					break;
-				}
-				rank++;
-			}
-			System.out.println();
-
 			Map<Integer, Double> sortedScores = IRUtil.sortMapByValue(query.documentScores);
 			query.documentScores = sortedScores;
 		}
 	}
 
-	public void outputRankedDocuments() {
+
+	public void outputRankedDocuments() throws FileNotFoundException {
+		PrintWriter writer = new PrintWriter(outputFileName);
 		for (Query query : querySet.values()) {
 			int rank = 1;
 			for (Map.Entry<Integer, Double> score : query.documentScores.entrySet()) {
-				System.out.println(query.id + " Q0 " + score.getKey() + " " + rank + " " + score.getValue());
+				writer.print(query.id + " Q0 " + score.getKey() + " " + rank + " ");
+				writer.printf("%.9f", score.getValue());		//TODO how many decimal places???
+				writer.println(" myers");
 				if (rank == 50) {
 					break;
 				}
 				rank++;
 			}
 		}
+		writer.close();
 	}
 
-	public void test() throws IOException {
-		invertedFileAccessor.prettyPrintList(invertedFileAccessor.readInvertedIndex("bird"));
+
+	/**
+	 * Prints the query vector for the first query in the given set of queries
+	 * Displays the processed query terms and their weights for topic #76
+	 */
+	private void printRunStatistics() {
+		Query query = querySet.get(76);
+		System.out.println("Terms and weights (counts) for query #76:");
+		for (Map.Entry<String, Integer> termWeights : query.bagOfWords.entrySet()) {
+			System.out.println("\t" + termWeights.getKey() + ": " + termWeights.getValue());
+		}
+		System.out.println();
+
+		System.out.println("Vocabulary size: " + invertedFileAccessor.getVocabularySize() + "\n");
+		System.out.println("Number of documents indexed: " + numDocuments + "\n");
+
+		if (useStemming) {
+			System.out.println("Run-time for cosine similarity using stemming: " + cosineSimilarityRuntime + " minutes\n");
+		}
+		else {
+			System.out.println("Run-time for cosine similarity without stemming: " + cosineSimilarityRuntime + " minutes\n");
+		}
+
+		invertedFileAccessor.printFileSizeInformation();
+	}
+
+
+	public void computeDocumentSimilarity() throws IOException {
+		long startTime = System.currentTimeMillis();
 		computeAllScores();
 		outputRankedDocuments();
+		long endTime = System.currentTimeMillis();
+		cosineSimilarityRuntime = endTime - startTime;
+		cosineSimilarityRuntime = cosineSimilarityRuntime / 1000 / 60;
+
+		printRunStatistics();
 	}
 
+
 	public static void main(String[] args) throws IOException {
-		DocumentSimilarity documentSimilarity = new DocumentSimilarity("animal.txt", "animal.topics.txt");
-		documentSimilarity.test();
+		//DocumentSimilarity documentSimilarityWithoutStemming = new DocumentSimilarity("fire10.en.utf8", "fire10.topics.en.utf8", "myers-a.txt", false);
+		//documentSimilarityWithoutStemming.computeDocumentSimilarity();
+
+		DocumentSimilarity documentSimilarityWithStemming = new DocumentSimilarity("fire10.en.utf8", "fire10.topics.en.utf8", "myers-b.txt", true);
+		documentSimilarityWithStemming.computeDocumentSimilarity();
 	}
 }

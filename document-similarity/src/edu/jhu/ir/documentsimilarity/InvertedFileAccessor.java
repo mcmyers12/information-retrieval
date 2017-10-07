@@ -34,13 +34,13 @@ import edu.jhu.ir.documentsimilarity.IRUtil.Term;
  *
  */
 public class InvertedFileAccessor {
+	private boolean useStemming;
 	private final int INT_SIZE = 4;  // Number of bytes per int written to the inverted file
 	private final String INVERTED_FILENAME = "inverted-file.bin";
 	private final String DICTIONARY_FILENAME = "dictionary.ser";
 	private String inputFileName; // Name of input file for which to create inverted file
 	private int numDocuments = 0; // Number of paragraphs processed
 	private int vocabularySize = 0; // Number of unique words observed
-	private int collectionSize = 0; // Total number of words encountered
 	private Map<String, Term> lexicon = new HashMap<>();  // Lexicon that will hold all terms
 	private Map<String, List<InvertedFileRecord>> invertedFileRecords = new TreeMap<>();	// Map containing each inverted file record sorted by term, then docId
 
@@ -49,8 +49,9 @@ public class InvertedFileAccessor {
 	 * Given an input file name, builds an inverted index and lexicon on disk
 	 * @param inputFileName
 	 */
-	public InvertedFileAccessor(String inputFileName) {
+	public InvertedFileAccessor(String inputFileName, boolean useStemming) {
 		this.inputFileName = inputFileName;
+		this.useStemming = useStemming;
 
 		//Build the dictionary
 		buildLexicon();
@@ -69,6 +70,11 @@ public class InvertedFileAccessor {
 
 	public int getNumDocuments() {
 		return numDocuments;
+	}
+
+
+	public int getVocabularySize() {
+		return vocabularySize;
 	}
 
 
@@ -185,8 +191,11 @@ public class InvertedFileAccessor {
 					List<String> tokens = IRUtil.tokenize(currentLine);
 
 					for (String token : tokens) {
-						collectionSize++;
-
+						if (useStemming) {
+							if (token.length() > 5) {
+								token = token.substring(0, 5);
+							}
+						}
 						if (tokensInDocument.containsKey(token)) {
 							int count = tokensInDocument.get(token).intValue();
 							tokensInDocument.put(token, ++count);
@@ -276,39 +285,6 @@ public class InvertedFileAccessor {
 	}
 
 
-	//TODO probably don't need
-	/**
-	 * Read in the serialized dictionary from disk
-	 * @throws IOException
-	 * @throws ClassNotFoundException
-	 */
-	@SuppressWarnings("unchecked")
-	public void readDictionaryFromFile() throws IOException, ClassNotFoundException {
-		InputStream file = new FileInputStream(DICTIONARY_FILENAME);
-		InputStream buffer = new BufferedInputStream(file);
-		ObjectInput input = new ObjectInputStream (buffer);
-		lexicon = (Map<String, Term>) input.readObject();
-		input.close();
-	}
-
-
-	/**
-	 * Print a list of InvertedFileRecord objects, on record per line
-	 * If the list is empty, print none
-	 * @param invertedFileRecordList
-	 */
-	public void prettyPrintList(List<InvertedFileRecord> invertedFileRecordList) {
-		if (invertedFileRecordList.isEmpty()) {
-			System.out.println("\tnone");
-		}
-		else {
-			for (InvertedFileRecord invertedFileRecord : invertedFileRecordList) {
-				System.out.println("\t" + invertedFileRecord);
-			}
-		}
-	}
-
-
 	/**
 	 * Get and display the file size information for the dictionary file and the inverted file
 	 * Determine whether the original text or the index takes more space and print this information
@@ -317,94 +293,14 @@ public class InvertedFileAccessor {
 	public void printFileSizeInformation() {
 		File dictionaryFile = new File(DICTIONARY_FILENAME);
 		long dictionaryFileSize = dictionaryFile.length();
+		System.out.println("Dictionary file size in GB: " + (double) dictionaryFileSize / 1000000000);
 		System.out.println("Dictionary file size in bytes: " + dictionaryFileSize);
 
 		File invertedFile = new File(INVERTED_FILENAME);
 		long invertedFileSize = invertedFile.length();
-		System.out.println("\nInverted file size in bytes: " + invertedFileSize);
-
-		File inputFile = new File(inputFileName);
-		long inputFileSize = inputFile.length();
-		long indexSize = dictionaryFileSize + invertedFileSize;
-
-		if (inputFileSize > indexSize) {
-			System.out.println("\nThe original text takes up more space than the index");
-		}
-		else {
-			System.out.println("\nThe index takes up more space than the original text");
-		}
-
-		if (invertedFileSize > dictionaryFileSize) {
-			System.out.println("\nThe inverted file takes up more space than the dictionary file");
-		}
-		else {
-			System.out.println("\nThe dictionary file takes up more space than the inverted file");
-		}
+		System.out.println("\nInverted file size in GB: " + (double) invertedFileSize  / 1000000000);
+		System.out.println("Inverted file size in bytes: " + invertedFileSize);
 	}
-
-
-	/**
-	 * Execute test cases using the inverted file
-	 * Print the number of documents, vocabulary size, and collection size
-	 * Print out the document frequency and posting list for terms: study, plutonium, Rome, Athens, feasts
-	 * Print out the document frequency for terms: horse, lovingkindness, Mary, dance
-	 * @throws IOException
-	 */
-	public void testInvertedFile() throws IOException {
-		System.out.println("---------------------------------" + "Statistics for file " + inputFileName + "---------------------------------");
-		System.out.println("\nNumber of documents (paragraphs) processed");
-		System.out.println("\t" + numDocuments);
-		System.out.println("\nVocabulary size (number of unique words observed)");
-		System.out.println("\t" + vocabularySize);
-		System.out.println("\nCollection size (total number of words encountered)");
-		System.out.println("\t" + collectionSize);
-
-		System.out.println("\nExample document frequencies and postings lists:");
-		System.out.println("  less");
-		prettyPrintList(readInvertedIndex("less"));
-		System.out.println("  sleep");
-		prettyPrintList(readInvertedIndex("sleep"));
-		System.out.println("  expand");
-		prettyPrintList(readInvertedIndex("expand"));
-		System.out.println("  a");
-		prettyPrintList(readInvertedIndex("a"));
-
-		System.out.println("\nExample document frequencies:");
-		System.out.println("  a\n\t" + lexicon.get("a").getDocumentFrequency());
-		System.out.println("  the\n\t" + lexicon.get("the").getDocumentFrequency());
-	}
-
-
-	/**
-	 * Test InvertedFileBuilder
-	 * @throws ClassNotFoundException
-	 * @throws IOException
-	 */
-	public void testInvertedFileBuilder() throws ClassNotFoundException, IOException {
-		//Build the dictionary
-		buildLexicon();
-
-		//Create the inverted file and write to binary file
-		createInvertedIndex();
-
-		//Write the lexicon to disk
-		writeDictionaryToFile();
-
-		//Read the lexicon from disk
-		readDictionaryFromFile();
-
-		//Read test terms, postings lists, and document frequencies from the inverted file
-		testInvertedFile();
-
-		//Print the file sizes for the dictioanry and inverted file in bytes
-		printFileSizeInformation();
-	}
-
-
-	/*public static void main(String[] args) throws IOException, ClassNotFoundException {
-		InvertedFileAccessor invertedFileBuilder = new InvertedFileAccessor("fire10TEST.en.utf8");
-		invertedFileBuilder.testInvertedFileBuilder();;
-	}*/
 }
 
 
