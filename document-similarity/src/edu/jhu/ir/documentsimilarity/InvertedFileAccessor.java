@@ -293,13 +293,13 @@ public class InvertedFileAccessor {
 	public void printFileSizeInformation() {
 		File dictionaryFile = new File(DICTIONARY_FILENAME);
 		long dictionaryFileSize = dictionaryFile.length();
-		System.out.println("Dictionary file size in GB: " + (double) dictionaryFileSize / 1000000000);
-		System.out.println("Dictionary file size in bytes: " + dictionaryFileSize);
+
+		System.out.print("Dictionary file size in GB: ");
+		System.out.printf("%.9f", (double) dictionaryFileSize / 1000000000);
 
 		File invertedFile = new File(INVERTED_FILENAME);
 		long invertedFileSize = invertedFile.length();
-		System.out.println("\nInverted file size in GB: " + (double) invertedFileSize  / 1000000000);
-		System.out.println("Inverted file size in bytes: " + invertedFileSize);
+		System.out.println("\n\nInverted file size in GB: " + (double) invertedFileSize  / 1000000000);
 	}
 }
 

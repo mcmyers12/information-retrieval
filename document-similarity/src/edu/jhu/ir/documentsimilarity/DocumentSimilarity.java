@@ -74,12 +74,12 @@ public class DocumentSimilarity {
 
 		double idf;
 		if (documentFrequency > 0) {
-			idf = Math.log(numDocuments / documentFrequency);	//Log base 2
+			idf = Math.log(numDocuments / documentFrequency) / Math.log(2);	//Log base 2
 		}
 		else {
 			idf = 0;
 		}
-		//IDF = numDocuments / term.documentFrequency
+
 		return idf;
 	}
 
@@ -142,25 +142,25 @@ public class DocumentSimilarity {
 
 				scoreAccumulator.put(documentId, partialDotProduct);
 			}
+		}
 
-			for (int documentId : scoreAccumulator.keySet()) {
-				double dotProduct = scoreAccumulator.get(documentId);
-				double documentVectorLength = documentVectorLengths.get(documentId);
-				double denominator = documentVectorLength * queryVectorLength;
+		for (int documentId : scoreAccumulator.keySet()) {
+			double dotProduct = scoreAccumulator.get(documentId);
+			double documentVectorLength = documentVectorLengths.get(documentId);
+			double denominator = documentVectorLength * queryVectorLength;
 
-				double cosineScore;
-				if (denominator == 0) {
-					cosineScore = 0;
-				}
-				else {
-					cosineScore = dotProduct / (documentVectorLength * queryVectorLength);
-				}
-
-				scoreAccumulator.put(documentId, cosineScore);
+			double cosineScore;
+			if (denominator == 0) {
+				cosineScore = 0;
+			}
+			else {
+				cosineScore = dotProduct / (documentVectorLength * queryVectorLength);
 			}
 
-			query.documentScores = scoreAccumulator;
+			scoreAccumulator.put(documentId, cosineScore);
 		}
+
+		query.documentScores = scoreAccumulator;
 	}
 
 
@@ -314,7 +314,8 @@ public class DocumentSimilarity {
 	 * Displays the processed query terms and their weights for topic #76
 	 */
 	private void printRunStatistics() {
-		Query query = querySet.get(76);
+		System.out.println("-------Program output for cosine similarity scoring " + (useStemming ? "with stemming-------\n" : "without stemming-------\n"));
+		Query query = querySet.get(1);									//TODO CHANGE THIS BACK TO 76
 		System.out.println("Terms and weights (counts) for query #76:");
 		for (Map.Entry<String, Integer> termWeights : query.bagOfWords.entrySet()) {
 			System.out.println("\t" + termWeights.getKey() + ": " + termWeights.getValue());
@@ -332,6 +333,7 @@ public class DocumentSimilarity {
 		}
 
 		invertedFileAccessor.printFileSizeInformation();
+		System.out.println("\n---------------------------------------------------------------------------\n\n");
 	}
 
 
@@ -348,10 +350,10 @@ public class DocumentSimilarity {
 
 
 	public static void main(String[] args) throws IOException {
-		//DocumentSimilarity documentSimilarityWithoutStemming = new DocumentSimilarity("fire10.en.utf8", "fire10.topics.en.utf8", "myers-a.txt", false);
-		//documentSimilarityWithoutStemming.computeDocumentSimilarity();
+		DocumentSimilarity documentSimilarityWithoutStemming = new DocumentSimilarity("animal.txt", "animal.topics.txt", "myers-a.txt", false);
+		documentSimilarityWithoutStemming.computeDocumentSimilarity();
 
-		DocumentSimilarity documentSimilarityWithStemming = new DocumentSimilarity("fire10.en.utf8", "fire10.topics.en.utf8", "myers-b.txt", true);
+		DocumentSimilarity documentSimilarityWithStemming = new DocumentSimilarity("animal.txt", "animal.topics.txt", "animal-output.txt", true);
 		documentSimilarityWithStemming.computeDocumentSimilarity();
 	}
 }
