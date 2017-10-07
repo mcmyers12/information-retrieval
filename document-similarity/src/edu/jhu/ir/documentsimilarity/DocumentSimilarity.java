@@ -4,10 +4,10 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import edu.jhu.ir.documentsimilarity.IRUtil.Document;
 import edu.jhu.ir.documentsimilarity.IRUtil.InvertedFileRecord;
 import edu.jhu.ir.documentsimilarity.IRUtil.Term;
 
@@ -33,30 +33,41 @@ import edu.jhu.ir.documentsimilarity.IRUtil.Term;
 public class DocumentSimilarity {
 
 	private Map<Integer, Double> documentVectorLengths = new HashMap<>();
-	private Map<Integer, Document> documents = new HashMap<>();	//Map of document ID to document object
 	private Map<String, Term> lexicon = new HashMap<>();  // Lexicon that will hold all terms
-	private Map<Integer, Query> querySet = new HashMap<>();
+	private Map<Integer, Query> querySet = new LinkedHashMap<>(); //Map of query id to query object that preserves original ordering of queries
 	private int numDocuments;
-	private String inputFileName;
 	private String queryFileName;
 	private InvertedFileAccessor invertedFileAccessor;
 
 	public DocumentSimilarity(String inputFileName, String queryFileName) {
-		this.inputFileName = inputFileName;
 		this.queryFileName = queryFileName;
 		invertedFileAccessor = new InvertedFileAccessor(inputFileName);
 		lexicon = invertedFileAccessor.getLexiconFromDisk();
 		numDocuments = invertedFileAccessor.getNumDocuments();
 	}
 
+
 	private class Query {
+		private int id;
 		private Map<String, Integer> bagOfWords = new HashMap<>();
+		private Map<Integer, Double> documentScores = new LinkedHashMap<>(); //Map of document ID to score for the query, preserves insertion order
+
+		public Query(int id) {
+			this.id = id;
+		}
 	}
+
 
 	//Document frequency is stored in the dictionary	//TODO possibly precompute this???
 	private double getIdf(String term) {
 		int documentFrequency = lexicon.get(term).getDocumentFrequency();
-		double idf = Math.log(numDocuments / documentFrequency);	//Log base 2
+		double idf;
+		if (documentFrequency > 0) {
+			idf = Math.log(numDocuments / documentFrequency);	//Log base 2
+		}
+		else {
+			idf = 0;
+		}
 		//IDF = numDocuments / term.documentFrequency
 		return idf;
 	}
@@ -68,7 +79,7 @@ public class DocumentSimilarity {
 		for (Map.Entry<String, Integer> entry : query.bagOfWords.entrySet()) {
 			int queryTermFrequency = entry.getValue();
 			String term = entry.getKey();
-			double tfIdf = queryTermFrequency * getIdf(term);	//TODO use TFIDF here or just counts???
+			double tfIdf = queryTermFrequency * getIdf(term);
 
 			queryVectorLength += tfIdf * tfIdf;
 		}
@@ -95,7 +106,7 @@ public class DocumentSimilarity {
 	//Then, sort the documents by score - heapsort may be best
 
 	//Last part of implementation video discusses options to improve efficiency
-	private void getScores(Query query) throws IOException {
+	private void computeQueryScores(Query query) throws IOException {
 
 		//For the dot product part of cosine metric, we can use only the terms that are in the query
 		Map<Integer, Double> scoreAccumulator = new HashMap<>(); //Document ID to dot product
@@ -125,10 +136,23 @@ public class DocumentSimilarity {
 			for (int documentId : scoreAccumulator.keySet()) {
 				double dotProduct = scoreAccumulator.get(documentId);
 				double documentVectorLength = documentVectorLengths.get(documentId);
-				double cosineScore = dotProduct / (documentVectorLength * queryVectorLength);
+				double denominator = documentVectorLength * queryVectorLength;
+
+				double cosineScore;
+				if (denominator == 0) {
+					cosineScore = 0;
+				}
+				else {
+					cosineScore = dotProduct / (documentVectorLength * queryVectorLength);
+				}
 
 				scoreAccumulator.put(documentId, cosineScore);
+				//
+				//				System.out.println("documentId: " + documentId);
+				//				System.out.println("cosineScore: " + cosineScore);
 			}
+
+			query.documentScores = scoreAccumulator;
 		}
 	}
 
@@ -144,7 +168,7 @@ public class DocumentSimilarity {
 	//	calculate TF-IDF, store that squared value stored into an accumulator for each doc ID
 	//A sum of squared weights will then be stored for each document, and after all terms are seen,
 	//	take sqrt
-	public void computeDocumentVectorLengths() throws IOException {
+	private void computeDocumentVectorLengths() throws IOException {
 		Map<Integer, Double> documentTfIdfAccumulator = new HashMap<>();
 		for (String term : lexicon.keySet()) { //Get squared tf-idf weights for all terms in all documents
 			List<InvertedFileRecord> invertedFileRecords = invertedFileAccessor.readInvertedIndex(term);
@@ -162,6 +186,7 @@ public class DocumentSimilarity {
 				else { //Otherwise initialize the entry in the map with a new squared weight
 					squaredWeights = tfIdf * tfIdf;
 				}
+
 				documentTfIdfAccumulator.put(documentId, squaredWeights);
 			}
 		}
@@ -210,7 +235,7 @@ public class DocumentSimilarity {
 		while ((currentLine = bufferedReader.readLine()) != null) {
 			if (currentLine.startsWith("<Q ID=")) { // The start of a new query
 				int queryId = Integer.parseInt(currentLine.replace("<Q ID=", "").replace(">", ""));
-				querySet.put(queryId, new Query());
+				querySet.put(queryId, new Query(queryId));
 
 				currentLine = bufferedReader.readLine();
 				Map<String, Integer> tokensInQuery = new HashMap<>();
@@ -246,18 +271,50 @@ public class DocumentSimilarity {
 	/**
 	 * Produces a single output file containing ranked documents for all topics
 	 * Provides the top 50 ranked documents for each query
+	 * @throws IOException
 	 */
-	public void outputRankedDocuments() {
+	public void computeAllScores() throws IOException {
+		processQueryFile();
+		computeDocumentVectorLengths();
+		for (Query query : querySet.values()) { //TODO make sure this is processed in query order
+			computeQueryScores(query);
 
+			int rank = 1;
+			for (Map.Entry<Integer, Double> score : query.documentScores.entrySet()) {
+				System.out.println(query.id + " Q0 " + score.getKey() + " " + rank + " " + score.getValue());
+				if (rank == 50) {
+					break;
+				}
+				rank++;
+			}
+			System.out.println();
+
+			Map<Integer, Double> sortedScores = IRUtil.sortMapByValue(query.documentScores);
+			query.documentScores = sortedScores;
+		}
+	}
+
+	public void outputRankedDocuments() {
+		for (Query query : querySet.values()) {
+			int rank = 1;
+			for (Map.Entry<Integer, Double> score : query.documentScores.entrySet()) {
+				System.out.println(query.id + " Q0 " + score.getKey() + " " + rank + " " + score.getValue());
+				if (rank == 50) {
+					break;
+				}
+				rank++;
+			}
+		}
 	}
 
 	public void test() throws IOException {
-		invertedFileAccessor.prettyPrintList(invertedFileAccessor.readInvertedIndex("sleep"));
-		processQueryFile();
+		invertedFileAccessor.prettyPrintList(invertedFileAccessor.readInvertedIndex("bird"));
+		computeAllScores();
+		outputRankedDocuments();
 	}
 
 	public static void main(String[] args) throws IOException {
-		DocumentSimilarity documentSimilarity = new DocumentSimilarity("fire10TEST.en.utf8", "fire10.topics.en.utf8");
+		DocumentSimilarity documentSimilarity = new DocumentSimilarity("animal.txt", "animal.topics.txt");
 		documentSimilarity.test();
 	}
 }

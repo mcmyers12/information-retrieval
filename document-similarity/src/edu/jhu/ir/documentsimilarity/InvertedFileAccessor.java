@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
-import edu.jhu.ir.documentsimilarity.IRUtil.Document;
 import edu.jhu.ir.documentsimilarity.IRUtil.InvertedFileRecord;
 import edu.jhu.ir.documentsimilarity.IRUtil.Term;
 
@@ -44,7 +43,6 @@ public class InvertedFileAccessor {
 	private int collectionSize = 0; // Total number of words encountered
 	private Map<String, Term> lexicon = new HashMap<>();  // Lexicon that will hold all terms
 	private Map<String, List<InvertedFileRecord>> invertedFileRecords = new TreeMap<>();	// Map containing each inverted file record sorted by term, then docId
-	private Map<Integer, Document> documents = new HashMap<>();	//Map of document ID to document object
 
 
 	/**
@@ -180,8 +178,6 @@ public class InvertedFileAccessor {
 			if (currentLine.startsWith("<P ID=")) { // The start of a new document (paragraph)
 				numDocuments++;
 				int documentId = Integer.parseInt(currentLine.replace("<P ID=", "").replace(">", ""));
-				Document document = new Document(documentId);
-
 				currentLine = bufferedReader.readLine();
 				Map<String, Integer> tokensInDocument = new HashMap<>();
 
