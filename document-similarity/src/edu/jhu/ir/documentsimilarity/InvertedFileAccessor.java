@@ -68,16 +68,28 @@ public class InvertedFileAccessor {
 	}
 
 
+	/**
+	 * Get the number of documents processed
+	 * @return
+	 */
 	public int getNumDocuments() {
 		return numDocuments;
 	}
 
 
+	/**
+	 * Get the vocabulary size - number of unique words observed
+	 * @return
+	 */
 	public int getVocabularySize() {
 		return vocabularySize;
 	}
 
 
+	/**
+	 * Retrieve the dictionary from disk
+	 * @return
+	 */
 	@SuppressWarnings("unchecked")
 	public Map<String, Term> getLexiconFromDisk() {
 		ObjectInput input = null;
@@ -142,7 +154,7 @@ public class InvertedFileAccessor {
 	/**
 	 * Read the input file and build the corresponding lexicon
 	 */
-	public void buildLexicon() {
+	private void buildLexicon() {
 		FileReader fileReader = null;
 		BufferedReader bufferedReader = null;
 		try {
@@ -239,7 +251,7 @@ public class InvertedFileAccessor {
 	 * Write to a binary file using 4-byte integers for document ids
 	 * and 4-byte integers for document term frequency
 	 */
-	public void createInvertedIndex() {
+	private void createInvertedIndex() {
 		RandomAccessFile randomAccessFile = null;
 		try {
 			randomAccessFile = new RandomAccessFile(INVERTED_FILENAME, "rw"); // Open inverted binary file for writing
@@ -277,7 +289,7 @@ public class InvertedFileAccessor {
 	 * Write the dictionary to a file as a serialized object
 	 * @throws IOException
 	 */
-	public void writeDictionaryToFile() throws IOException {
+	private void writeDictionaryToFile() throws IOException {
 		FileOutputStream fos = new FileOutputStream(DICTIONARY_FILENAME);
 		ObjectOutputStream oos = new ObjectOutputStream(fos);
 		oos.writeObject(lexicon);

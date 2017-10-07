@@ -4,15 +4,20 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * This class contains utility methods and classes for general information retrieval related tasks
+ * @author Miranda Myers
+ *
+ */
 public class IRUtil {
+
 	/**
-	 * Class representing a term that is used to build the lexicon and list of terms
+	 * Class representing a term that is used to build a lexicon and list of terms
 	 */
 	public static class Term implements Serializable {
 		private static final long serialVersionUID = -1947264671039701464L;
@@ -77,18 +82,6 @@ public class IRUtil {
 	}
 
 
-	public static class Document {
-		private int documentId;
-		private float vectorLength;
-		private Map<Integer, Float> scores = new HashMap<>(); //Map of query ID to document score for that query
-		private Map<String, Integer> termFrequencies = new HashMap<>();
-
-		public Document(int documentId) {
-			this.documentId = documentId;
-		}
-	}
-
-
 	/**
 	 * Tokenize a given string using the following approaches
 	 * Split on spaces
@@ -121,7 +114,7 @@ public class IRUtil {
 	 * Generic utility method to sort a map by value in descending order
 	 * (credit: https://stackoverflow.com/questions/109383/sort-a-mapkey-value-by-values-java)
 	 * @param map
-	 * @return
+	 * @return Map<K, V> result
 	 */
 	public static <K, V extends Comparable<? super V>> Map<K, V> sortMapByValue(Map<K, V> map) {
 		List<Map.Entry<K, V>> list = new LinkedList<Map.Entry<K, V>>(map.entrySet());

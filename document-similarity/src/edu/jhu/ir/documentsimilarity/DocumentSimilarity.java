@@ -54,6 +54,12 @@ public class DocumentSimilarity {
 	}
 
 
+	/**
+	 * Class representing a query that holds the query bag of words representation
+	 * and document scores for the query
+	 * Document scores are sorted in ranked order
+	 *
+	 */
 	private class Query {
 		private int id;
 		private Map<String, Integer> bagOfWords = new HashMap<>();
@@ -65,7 +71,12 @@ public class DocumentSimilarity {
 	}
 
 
-	//Document frequency is stored in the dictionary	//TODO possibly precompute this???
+	/**
+	 * Get the inverse document frequency (IDF) for a given term
+	 * IDF = log2(numberDocuments / termFrequency)
+	 * @param term
+	 * @return
+	 */
 	private double getIdf(String term) {
 		int documentFrequency = 0;
 		if (lexicon.containsKey(term)) {
@@ -84,7 +95,13 @@ public class DocumentSimilarity {
 	}
 
 
-	//Square root of sum of squares of all of the term weights in the query
+	/**
+	 * Compute the length of a vector representation of query
+	 * The document vector length is the square root of the sum of squares of all the term
+	 * weights in the query - term weights are TF-IDF
+	 * @param query
+	 * @return
+	 */
 	private double computeQueryVectorLength(Query query) {
 		double queryVectorLength = 0;
 		for (Map.Entry<String, Integer> entry : query.bagOfWords.entrySet()) {
@@ -100,24 +117,22 @@ public class DocumentSimilarity {
 	}
 
 
-	//We return the documents ranked by the closeness of their vectors to the query
-
-	//Put each documentID into a hash table pointing to scores - key: docId, value: score
-	//Scores should be initialized to 0
-
-	//Keep an accumulator of docId -> scores
-	//Cosine scores are computed one term at a time
-	//	Take the first query term, seek into the inverted file to find docIds and term counts
-	//		compute the tf-idf weight, multiply that by the appropriate query term tf-idf,
-	//		add that product (partial dot product) into an accumulator where we are storing the document scores
-	//		As we process more and more terms, the scores for documents will tend to increase
-	//	Only consider terms both in document and query
-	//After all query terms are processed, divide partial dot product by query length * document length
-	//Then, sort the documents by score - heapsort may be best
-
-	//Last part of implementation video discusses options to improve efficiency
+	/**
+	 * Compute document scores for a given query based on cosine similarity using vector space models
+	 * Implementation details:
+	 * 	Keep an accumulator of docId -> scores
+	 *  Cosine scores are computed one term at a time
+	 *	Take each query term, seek into the inverted file to find docIds and term counts
+	 *		compute the tf-idf weight, multiply that by the appropriate query term tf-idf,
+	 *		add that product (partial dot product) into an accumulator where document scores are stored
+	 *	Only consider terms both in the document and query
+	 *  After all query terms are processed, divide partial dot product by query length * document length
+	 *  Then, sort the documents by score
+	 *
+	 * @param query
+	 * @throws IOException
+	 */
 	private void computeQueryScores(Query query) throws IOException {
-
 		//For the dot product part of cosine metric, we can use only the terms that are in the query
 		Map<Integer, Double> scoreAccumulator = new HashMap<>(); //Document ID to dot product
 
@@ -164,17 +179,18 @@ public class DocumentSimilarity {
 	}
 
 
-	//Term frequency is stored in the inverted file
-	//Query vector length can be computed one time and reused to rank the different documents
-	//To compute document length, you need to compute the TF-IDF values for each term in the document
-	//DF is not know for all terms until the last term is seen
-	//
-	//Sum of squares of all of the term weights in the whole document
-	//After all documents have been seen, doc lengths can be computed one term at a time,
-	//	by walking over every entry in the dictionary, look up entry in the inverted file
-	//	calculate TF-IDF, store that squared value stored into an accumulator for each doc ID
-	//A sum of squared weights will then be stored for each document, and after all terms are seen,
-	//	take sqrt
+	/**
+	 * Compute vector lengths for all documents
+	 * Square root of sum of squares of all of the term weights in the whole document
+	 * Implementation details:
+	 * 	After all documents have been seen, doc lengths can be computed one term at a time,
+	 *  by walking over every entry in the dictionary, look up entry in the inverted file
+	 *  calculate TF-IDF, store that squared value stored into an accumulator for each doc ID
+	 *  A sum of squared weights will then be stored for each document, and after all terms are seen,
+	 *	take sqrt
+	 *
+	 * @throws IOException
+	 */
 	private void computeDocumentVectorLengths() throws IOException {
 		Map<Integer, Double> documentTfIdfAccumulator = new HashMap<>();
 		for (String term : lexicon.keySet()) { //Get squared tf-idf weights for all terms in all documents
@@ -237,6 +253,11 @@ public class DocumentSimilarity {
 	}
 
 
+	/**
+	 * Helper method to build the set of queries
+	 * @param bufferedReader
+	 * @throws IOException
+	 */
 	private void buildQuerySet(BufferedReader bufferedReader) throws IOException {
 		String currentLine;
 
@@ -280,17 +301,6 @@ public class DocumentSimilarity {
 	 * Provides the top 50 ranked documents for each query
 	 * @throws IOException
 	 */
-	private void computeAllScores() throws IOException {
-		processQueryFile();
-		computeDocumentVectorLengths();
-		for (Query query : querySet.values()) { //TODO make sure this is processed in query order
-			computeQueryScores(query);
-			Map<Integer, Double> sortedScores = IRUtil.sortMapByValue(query.documentScores);
-			query.documentScores = sortedScores;
-		}
-	}
-
-
 	public void outputRankedDocuments() throws FileNotFoundException {
 		PrintWriter writer = new PrintWriter(outputFileName);
 		for (Query query : querySet.values()) {
@@ -311,11 +321,12 @@ public class DocumentSimilarity {
 
 	/**
 	 * Prints the query vector for the first query in the given set of queries
-	 * Displays the processed query terms and their weights for topic #76
+	 * 	Displays the processed query terms and their weights for topic #76
+	 * Prints the vocabulary size, number of documents indexed, run time, and file size information
 	 */
 	private void printRunStatistics() {
 		System.out.println("-------Program output for cosine similarity scoring " + (useStemming ? "with stemming-------\n" : "without stemming-------\n"));
-		Query query = querySet.get(1);									//TODO CHANGE THIS BACK TO 76
+		Query query = querySet.get(76);
 		System.out.println("Terms and weights (counts) for query #76:");
 		for (Map.Entry<String, Integer> termWeights : query.bagOfWords.entrySet()) {
 			System.out.println("\t" + termWeights.getKey() + ": " + termWeights.getValue());
@@ -337,6 +348,25 @@ public class DocumentSimilarity {
 	}
 
 
+	/**
+	 * Process the query file and compute scores for all queries
+	 * @throws IOException
+	 */
+	private void computeAllScores() throws IOException {
+		processQueryFile();
+		computeDocumentVectorLengths();
+		for (Query query : querySet.values()) {
+			computeQueryScores(query);
+			Map<Integer, Double> sortedScores = IRUtil.sortMapByValue(query.documentScores);
+			query.documentScores = sortedScores;
+		}
+	}
+
+
+	/**
+	 * Compute all scores, output ranked documents to a file, and print the run statistics
+	 * @throws IOException
+	 */
 	public void computeDocumentSimilarity() throws IOException {
 		long startTime = System.currentTimeMillis();
 		computeAllScores();
@@ -350,10 +380,10 @@ public class DocumentSimilarity {
 
 
 	public static void main(String[] args) throws IOException {
-		DocumentSimilarity documentSimilarityWithoutStemming = new DocumentSimilarity("animal.txt", "animal.topics.txt", "myers-a.txt", false);
-		documentSimilarityWithoutStemming.computeDocumentSimilarity();
+		//DocumentSimilarity documentSimilarityWithoutStemming = new DocumentSimilarity("fire10.en.utf8", "fire10.topics.en.utf8", "myers-a.txt", false);
+		//documentSimilarityWithoutStemming.computeDocumentSimilarity();
 
-		DocumentSimilarity documentSimilarityWithStemming = new DocumentSimilarity("animal.txt", "animal.topics.txt", "animal-output.txt", true);
+		DocumentSimilarity documentSimilarityWithStemming = new DocumentSimilarity("fire10.en.utf8", "fire10.topics.en.utf8", "myers-b.txt", true);
 		documentSimilarityWithStemming.computeDocumentSimilarity();
 	}
 }
