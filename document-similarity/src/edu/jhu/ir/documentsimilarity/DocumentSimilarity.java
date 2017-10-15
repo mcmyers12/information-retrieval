@@ -307,7 +307,7 @@ public class DocumentSimilarity {
 			int rank = 1;
 			for (Map.Entry<Integer, Double> score : query.documentScores.entrySet()) {
 				writer.print(query.id + " Q0 " + score.getKey() + " " + rank + " ");
-				writer.printf("%.9f", score.getValue());		//TODO how many decimal places???
+				writer.printf("%.6f", score.getValue());
 				writer.println(" myers");
 				if (rank == 50) {
 					break;
