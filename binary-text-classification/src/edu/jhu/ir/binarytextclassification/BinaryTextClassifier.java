@@ -26,7 +26,6 @@ public class BinaryTextClassifier {
 	private Map<String, Integer> lexicon = new HashMap<>(); //Map of term string to termID
 	private int termIdCounter = 1;
 
-
 	private void buildLexicon(int...columnIndices) throws IOException {
 		buildLexicon("phase1.train.shuf.tsv", columnIndices);
 		buildLexicon("phase1.dev.shuf.tsv", columnIndices);
@@ -45,13 +44,15 @@ public class BinaryTextClassifier {
 		while (row != null) {
 			String[] columns = row.split("\t");
 
-			for (int index : columnIndices) {
-				for (String token: IRUtil.tokenize(columns[index])) {
-					if (!lexicon.containsKey(token)) {
-						lexicon.put(token, termIdCounter);
-						termIdCounter++;
+			if (columns.length == 10) {
+				for (int index : columnIndices) {
+					for (String token: IRUtil.tokenize(columns[index])) {
+						if (!lexicon.containsKey(token)) {
+							lexicon.put(token, termIdCounter);
+							termIdCounter++;
 
-						//System.out.println(token + ": " + termId);
+							//System.out.println(token + ": " + termId);
+						}
 					}
 				}
 			}
@@ -68,32 +69,34 @@ public class BinaryTextClassifier {
 		String row = tsvFile.readLine(); // Read first line.
 
 		while (row != null) {
-			String classLabel = row.substring(0, 2).trim();
-			if (classLabel.equals("1")) {
-				classLabel = "+1";
-			}
-
-			writer.print(classLabel + " ");
-
 			String[] columns = row.split("\t");
-			Map<String, Integer> termIds = new HashMap<>();
-			for (int index : columnIndices) {
-				List<String> tokens = IRUtil.tokenize(columns[index]);
-				for (String token: tokens) {
-					termIds.put(token, lexicon.get(token));
+			if (columns.length == 10) {
+				String classLabel = row.substring(0, 2).trim();
+				if (classLabel.equals("1")) {
+					classLabel = "+1";
 				}
-			}
 
-			for (Map.Entry<String, Integer> entry: termIds.entrySet()) {
+				writer.print(classLabel + " ");
+
+				Map<String, Integer> termIds = new HashMap<>();
+				for (int index : columnIndices) {
+					List<String> tokens = IRUtil.tokenize(columns[index]);
+					for (String token: tokens) {
+						termIds.put(token, lexicon.get(token));
+					}
+				}
+
+				/*for (Map.Entry<String, Integer> entry: termIds.entrySet()) {
 				System.out.println(entry.getKey() + ": " + entry.getValue());
-			}
+				}*/
 
-			Map<String, Integer> sortedTermIds = IRUtil.sortMapByValue(termIds);
+				Map<String, Integer> sortedTermIds = IRUtil.sortMapByValue(termIds);
 
-			for (int termId: sortedTermIds.values()) {
-				writer.print(termId + ":1 ");
+				for (int termId: sortedTermIds.values()) {
+					writer.print(termId + ":1 ");
+				}
+				writer.println();
 			}
-			writer.println();
 			row = tsvFile.readLine(); // Read next line of data.
 		}
 		// Close the file once all data has been read.
@@ -119,8 +122,8 @@ public class BinaryTextClassifier {
 
 	public static void main(String[] args) throws IOException {
 		BinaryTextClassifier binaryTextClassifier = new BinaryTextClassifier();
-		binaryTextClassifier.buildLexicon(2);
-		binaryTextClassifier.outputFeatureVectors(2);
+		binaryTextClassifier.buildLexicon(2, 8, 9);
+		binaryTextClassifier.outputFeatureVectors(2, 8, 9);
 	}
 }
 
