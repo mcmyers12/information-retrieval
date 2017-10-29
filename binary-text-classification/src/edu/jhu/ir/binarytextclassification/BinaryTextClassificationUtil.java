@@ -9,13 +9,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Implementation of a binary classifier
- * Uses training data to build the classifier and then uses the trained model to
- * 		make predictions on the test data.
+ * Utility methods to support the use of open source machine learning toolkit SVMlight
  * Processes tab separated value (TSV) files (split into train, dev, and test sets)
- * 		and creates feature vectors
- * 		Train builds the models, dev is used in experiments, predictions are on test
- * Uses SVMs for training using open source mahchine learning toolkit SVMlight
+ * 		and creates feature vectors saved to a file in a format recognizable by SVMlight
+ * 		Train set is for building the models, dev is used in experiments, predictions are on test
+ *
+ * Using the results from SVMlight, calculates precision, recall, and f score
  *
  * @author Miranda Myers
  *
@@ -25,6 +24,11 @@ public class BinaryTextClassificationUtil {
 
 	private Map<String, Integer> termIdMap = new HashMap<>(); //Map of term string to termID
 	private int termIdCounter = 1;
+	private boolean attributed;
+
+	public BinaryTextClassificationUtil(boolean attributed) {
+		this.attributed = attributed;
+	}
 
 	/**
 	 * Builds a map of term to termID for all terms in all sets
@@ -53,6 +57,10 @@ public class BinaryTextClassificationUtil {
 			for (int index : columnIndices) {
 				if (columns.length > index) {
 					for (String token: IRUtil.tokenize(columns[index])) {
+						if (attributed) {
+							token = index + token;
+						}
+
 						if (!termIdMap.containsKey(token)) {
 							termIdMap.put(token, termIdCounter);
 							termIdCounter++;
@@ -85,7 +93,12 @@ public class BinaryTextClassificationUtil {
 			Map<String, Integer> termIds = new HashMap<>();
 			for (int index : columnIndices) {
 				List<String> tokens = IRUtil.tokenize(columns[index]);
+
 				for (String token: tokens) {
+					if (attributed) {
+						token = index + token;
+					}
+
 					termIds.put(token, termIdMap.get(token));
 				}
 			}
@@ -109,9 +122,10 @@ public class BinaryTextClassificationUtil {
 	 * Uses features only from the title sectino (column 3) of the data
 	 * @throws IOException
 	 */
-	public void outputFeatureVectors(int... columnIndices) throws IOException {
-		outputFeatureVectors("phase1.train.shuf.tsv", "experiment2-svmlight-train.txt", columnIndices);
-		outputFeatureVectors("phase1.dev.shuf.tsv", "experiment2-svmlight-dev.txt", columnIndices);
+	public void outputFeatureVectors(String filePrefix, int... columnIndices) throws IOException {
+		outputFeatureVectors("phase1.train.shuf.tsv", filePrefix + "-svmlight-train.txt", columnIndices);
+		outputFeatureVectors("phase1.dev.shuf.tsv", filePrefix + "-svmlight-dev.txt", columnIndices);
+		outputFeatureVectors("phase1.test.shuf.tsv", filePrefix + "-svmlight-test.txt", columnIndices);
 	}
 
 
@@ -126,7 +140,7 @@ public class BinaryTextClassificationUtil {
 		int recallNumerator = 0;
 		int recallDenominator = 0;
 
-		while (classifierOutputRow != null) { // && devFileRow != null) {
+		while (classifierOutputRow != null) {
 			double score = Double.parseDouble(classifierOutputRow);
 			String actualLabel = devFileRow.substring(0, 2).trim();
 
@@ -177,12 +191,68 @@ public class BinaryTextClassificationUtil {
 		classifierOutputFile.close();
 	}
 
-	public static void main(String[] args) throws IOException {
-		BinaryTextClassificationUtil binaryTextClassifier = new BinaryTextClassificationUtil();
-		//binaryTextClassifier.buildTermIdMap(2, 8, 9);
-		//binaryTextClassifier.outputFeatureVectors(2, 8, 9);
+	public void outputTestSetPredictions() throws IOException {
+		PrintWriter writer = new PrintWriter("myers-prog4.txt");
+		BufferedReader classifierOutputFile = new BufferedReader(new FileReader("experiment3-classifier-output-test.txt"));
+		BufferedReader testFile = new BufferedReader(new FileReader("phase1.test.shuf.tsv"));
 
-		binaryTextClassifier.calculateMetrics("experiment2-classifier-output.txt", "phase1.dev.shuf.tsv");
+		String classifierOutputRow = classifierOutputFile.readLine();
+		String testFileRow = testFile.readLine();
+		while (classifierOutputRow != null) {
+			String[] columns = testFileRow.split("\t", -1);
+			String docId = columns[1];
+
+			double score = Double.parseDouble(classifierOutputRow);
+
+			String predictedLabel;
+			if (score > 0) {
+				predictedLabel = "1";
+			}
+			else {
+				predictedLabel = "-1";
+			}
+
+			writer.println(docId + "\t" + predictedLabel);
+
+			classifierOutputRow = classifierOutputFile.readLine();
+			testFileRow = testFile.readLine();
+		}
+
+		writer.close();
+		classifierOutputFile.close();
+		testFile.close();
+	}
+
+	public static void main(String[] args) throws IOException {
+		BinaryTextClassificationUtil binaryTextClassifier = new BinaryTextClassificationUtil(false);
+
+		// Baseline and Scoring
+		//		binaryTextClassifier.buildTermIdMap(2);
+		//		binaryTextClassifier.outputFeatureVectors("baseline", 2);
+		//
+		//		// Experiment 1: Use features from title, abstract, and keywords
+		//		binaryTextClassifier.buildTermIdMap(2, 8, 9);
+		//		binaryTextClassifier.outputFeatureVectors("experiment1", 2, 8, 9);
+
+		// Experiment 2:
+		//		BinaryTextClassificationUtil binaryTextClassifierAttributed = new BinaryTextClassificationUtil(true);
+		//		binaryTextClassifierAttributed.buildTermIdMap(2, 8, 9);
+		//		binaryTextClassifierAttributed.outputFeatureVectors("experiment2", 2, 8, 9);
+
+		// Experiment 3:
+		BinaryTextClassificationUtil binaryTextClassifierAttributed = new BinaryTextClassificationUtil(true);
+		binaryTextClassifierAttributed.buildTermIdMap(2, 3, 4, 5, 6, 7, 8, 9);
+		binaryTextClassifierAttributed.outputFeatureVectors("experiment3", 2, 3, 4, 5, 6, 7, 8, 9);
+
+		// Metrics calculations
+		//binaryTextClassifier.calculateMetrics("baseline-classifier-output.txt", "phase1.dev.shuf.tsv");
+		//binaryTextClassifier.calculateMetrics("experiment1-classifier-output.txt", "phase1.dev.shuf.tsv");
+		//		binaryTextClassifier.calculateMetrics("experiment2-classifier-output.txt", "phase1.dev.shuf.tsv");
+		//binaryTextClassifier.calculateMetrics("experiment3-classifier-output.txt", "phase1.dev.shuf.tsv");
+		binaryTextClassifier.calculateMetrics("experiment3-classifier-output-test.txt", "phase1.test.shuf.tsv");
+
+		//Test set predictions:
+		binaryTextClassifierAttributed.outputTestSetPredictions();
 	}
 }
 
