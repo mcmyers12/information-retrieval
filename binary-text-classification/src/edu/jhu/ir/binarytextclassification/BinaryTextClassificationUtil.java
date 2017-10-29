@@ -10,16 +10,24 @@ import java.util.Map;
 
 /**
  * Utility methods to support the use of open source machine learning toolkit SVMlight
- * Processes tab separated value (TSV) files (split into train, dev, and test sets)
- * 		and creates feature vectors saved to a file in a format recognizable by SVMlight
- * 		Train set is for building the models, dev is used in experiments, predictions are on test
+ * Process tab separated value (TSV) files, which are split into train, dev, and test sets
+ * 		and create feature vectors saved to a file in a format recognizable by SVMlight
+ * Train set is for building the models, dev is used in experiments, predictions are on test
  *
- * Using the results from SVMlight, calculates precision, recall, and f score
+ * Using the results from SVMlight, calculate precision, recall, and f score
+ *
+ * Conduct four separate runs using SVM light
+ * 		1. Baseline: use features only from the title field
+ * 		2. Experiment 1: Use features from the title, abstract, and keywords fields
+ * 		3. Experiment 2: Use attributed fields, i.e. features are specific to the column they come from
+ * 		4. Experiment 4: Use attributed fields in addition to all columns in the data set
+ * 				Columns used: title, authors, journal, ISSN, year, language, abstract, keywords
+ *
+ * Output test set predictions to a file using the approach with the best results (Experiment 4)
  *
  * @author Miranda Myers
  *
  */
-
 public class BinaryTextClassificationUtil {
 
 	private Map<String, Integer> termIdMap = new HashMap<>(); //Map of term string to termID
@@ -30,8 +38,9 @@ public class BinaryTextClassificationUtil {
 		this.attributed = attributed;
 	}
 
+
 	/**
-	 * Builds a map of term to termID for all terms in all sets
+	 * Builds a map of term to termID for all terms in all sets - train, dev, test
 	 * Takes one or more column indices from which to build the term map
 	 * @param columnIndices
 	 * @throws IOException
@@ -42,8 +51,9 @@ public class BinaryTextClassificationUtil {
 		buildTermIdMap("phase1.test.shuf.tsv", columnIndices);
 	}
 
+
 	/**
-	 *
+	 * Helper method to build term ID map
 	 * @param columnIndices
 	 * @throws IOException
 	 */
@@ -75,6 +85,18 @@ public class BinaryTextClassificationUtil {
 		tsvFile.close();
 	}
 
+
+	/**
+	 * Given an input file name and an output file name, output a file containing
+	 * 		feature vectors, one document vector per line
+	 * Output file follows the format expected by SVM light
+	 * Binary weights are used for each term
+	 * The term ID map is sorted so that term IDs are in increasing order
+	 * @param inputFileName
+	 * @param outputFileName
+	 * @param columnIndices
+	 * @throws IOException
+	 */
 	public void outputFeatureVectors(String inputFileName, String outputFileName, int... columnIndices) throws IOException {
 		BufferedReader tsvFile = new BufferedReader(new FileReader(inputFileName));
 		PrintWriter writer = new PrintWriter(outputFileName);
@@ -119,7 +141,7 @@ public class BinaryTextClassificationUtil {
 	/**
 	 * Processes the data files and writes a file containing feature vectors,
 	 * 		one document vector per line
-	 * Uses features only from the title sectino (column 3) of the data
+	 * Takes one or more column indices that represent which features to use
 	 * @throws IOException
 	 */
 	public void outputFeatureVectors(String filePrefix, int... columnIndices) throws IOException {
@@ -129,6 +151,14 @@ public class BinaryTextClassificationUtil {
 	}
 
 
+	/**
+	 * Given output from an SVMLight classifier and the name of a dev set file,
+	 * 		calculate and print recall, precision, and f score
+	 * Print the numerator and denominator for precision and recall
+	 * @param classifierOutputFileName
+	 * @param devFileName
+	 * @throws IOException
+	 */
 	public void calculateMetrics(String classifierOutputFileName, String devFileName) throws IOException {
 		BufferedReader classifierOutputFile = new BufferedReader(new FileReader(classifierOutputFileName));
 		BufferedReader devFile = new BufferedReader(new FileReader(devFileName));
@@ -153,7 +183,7 @@ public class BinaryTextClassificationUtil {
 			}
 
 			if (predictedLabel.equalsIgnoreCase("1")) {
-				precisionDenominator++; //Increment every time to keep track of total
+				precisionDenominator++;
 			}
 
 			if (predictedLabel.equals(actualLabel) && predictedLabel.equals("1")) {
@@ -191,6 +221,13 @@ public class BinaryTextClassificationUtil {
 		classifierOutputFile.close();
 	}
 
+
+	/**
+	 * Given the output from experiment 3 SVMLight classifier run on the test set,
+	 * 		output test set predictions to a file
+	 * Use format docid [tab] prediction
+	 * @throws IOException
+	 */
 	public void outputTestSetPredictions() throws IOException {
 		PrintWriter writer = new PrintWriter("myers-prog4.txt");
 		BufferedReader classifierOutputFile = new BufferedReader(new FileReader("experiment3-classifier-output-test.txt"));
@@ -223,36 +260,50 @@ public class BinaryTextClassificationUtil {
 		testFile.close();
 	}
 
+
+	/**
+	 * Main execution program - sections in this main program are run separately in the following order:
+	 * 		1.  Methods to output feature vectors to files in SVMlight format
+	 *		2.  Methods to calculate metrics based on SVMlight output
+	 *		3.  Method to output test set predictions
+	 * @param args
+	 * @throws IOException
+	 */
 	public static void main(String[] args) throws IOException {
+
+		//////////////////////////Methods to output feature vectors to files in SVMlight format/////////////////
 		BinaryTextClassificationUtil binaryTextClassifier = new BinaryTextClassificationUtil(false);
 
 		// Baseline and Scoring
-		//		binaryTextClassifier.buildTermIdMap(2);
-		//		binaryTextClassifier.outputFeatureVectors("baseline", 2);
-		//
-		//		// Experiment 1: Use features from title, abstract, and keywords
-		//		binaryTextClassifier.buildTermIdMap(2, 8, 9);
-		//		binaryTextClassifier.outputFeatureVectors("experiment1", 2, 8, 9);
+		binaryTextClassifier.buildTermIdMap(2);
+		binaryTextClassifier.outputFeatureVectors("baseline", 2);
+
+		// Experiment 1: Use features from title, abstract, and keywords
+		binaryTextClassifier.buildTermIdMap(2, 8, 9);
+		binaryTextClassifier.outputFeatureVectors("experiment1", 2, 8, 9);
 
 		// Experiment 2:
-		//		BinaryTextClassificationUtil binaryTextClassifierAttributed = new BinaryTextClassificationUtil(true);
-		//		binaryTextClassifierAttributed.buildTermIdMap(2, 8, 9);
-		//		binaryTextClassifierAttributed.outputFeatureVectors("experiment2", 2, 8, 9);
+		BinaryTextClassificationUtil binaryTextClassifierAttributed = new BinaryTextClassificationUtil(true);
+		binaryTextClassifierAttributed.buildTermIdMap(2, 8, 9);
+		binaryTextClassifierAttributed.outputFeatureVectors("experiment2", 2, 8, 9);
 
 		// Experiment 3:
-		BinaryTextClassificationUtil binaryTextClassifierAttributed = new BinaryTextClassificationUtil(true);
-		binaryTextClassifierAttributed.buildTermIdMap(2, 3, 4, 5, 6, 7, 8, 9);
-		binaryTextClassifierAttributed.outputFeatureVectors("experiment3", 2, 3, 4, 5, 6, 7, 8, 9);
+		BinaryTextClassificationUtil binaryTextClassifierAttributedAllFeatures = new BinaryTextClassificationUtil(true);
+		binaryTextClassifierAttributedAllFeatures.buildTermIdMap(2, 3, 4, 5, 6, 7, 8, 9);
+		binaryTextClassifierAttributedAllFeatures.outputFeatureVectors("experiment3", 2, 3, 4, 5, 6, 7, 8, 9);
 
+
+		///////////////////////////////Methods to calculate metrics based on SVMlight output/////////////////////
 		// Metrics calculations
-		//binaryTextClassifier.calculateMetrics("baseline-classifier-output.txt", "phase1.dev.shuf.tsv");
-		//binaryTextClassifier.calculateMetrics("experiment1-classifier-output.txt", "phase1.dev.shuf.tsv");
-		//		binaryTextClassifier.calculateMetrics("experiment2-classifier-output.txt", "phase1.dev.shuf.tsv");
-		//binaryTextClassifier.calculateMetrics("experiment3-classifier-output.txt", "phase1.dev.shuf.tsv");
-		binaryTextClassifier.calculateMetrics("experiment3-classifier-output-test.txt", "phase1.test.shuf.tsv");
+		binaryTextClassifier.calculateMetrics("baseline-classifier-output.txt", "phase1.dev.shuf.tsv");
+		binaryTextClassifier.calculateMetrics("experiment1-classifier-output.txt", "phase1.dev.shuf.tsv");
+		binaryTextClassifier.calculateMetrics("experiment2-classifier-output.txt", "phase1.dev.shuf.tsv");
+		binaryTextClassifier.calculateMetrics("experiment3-classifier-output.txt", "phase1.dev.shuf.tsv");
 
+
+		//////////////////////////////Method to output test set predictions//////////////////////////////////////
 		//Test set predictions:
-		binaryTextClassifierAttributed.outputTestSetPredictions();
+		binaryTextClassifierAttributedAllFeatures.outputTestSetPredictions();
 	}
 }
 

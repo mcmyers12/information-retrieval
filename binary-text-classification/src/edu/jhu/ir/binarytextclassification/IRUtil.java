@@ -1,6 +1,5 @@
 package edu.jhu.ir.binarytextclassification;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -15,72 +14,6 @@ import java.util.Map;
  *
  */
 public class IRUtil {
-
-	/**
-	 * Class representing a term that is used to build a lexicon and list of terms
-	 */
-	public static class Term implements Serializable {
-		private static final long serialVersionUID = -1947264671039701464L;
-		private String text;	//Required in memory
-		private int invertedFileLocation;	//Required in memory
-		private int documentFrequency = 0; // Number of documents which the word occurs in	// Useful in memory
-
-		public int getDocumentFrequency() {
-			return documentFrequency;
-		}
-
-		public void setDocumentFrequency(int documentFrequency) {
-			this.documentFrequency = documentFrequency;
-		}
-
-		public int getInvertedFileLocation() {
-			return invertedFileLocation;
-		}
-
-		public void setInvertedFileLocation(int invertedFileLocation) {
-			this.invertedFileLocation = invertedFileLocation;
-		}
-
-		public void setText(String text) {
-			this.text = text;
-		}
-
-		@Override
-		public String toString() {
-			return text + "\t\t - document frequency: " + documentFrequency;
-		}
-	}
-
-
-	/**
-	 * Class representing an inverted file record that stores the document ID and
-	 * count for the number of times a term appears in that document
-	 * This class is used to hold the information that is stored to the inverted file
-	 */
-	public static class InvertedFileRecord {
-		private int documentId;
-		private int termFrequency;
-
-		public InvertedFileRecord(int documentId, int termFrequency) {
-			this.documentId = documentId;
-			this.termFrequency = termFrequency;
-		}
-
-		public int getTermFrequency() {
-			return termFrequency;
-		}
-
-		public int getDocumentId() {
-			return documentId;
-		}
-
-		@Override
-		public String toString() {
-			return "(documentID: " + documentId
-					+ ", count: " + termFrequency + ")";
-		}
-	}
-
 
 	/**
 	 * Tokenize a given string using the following approaches
