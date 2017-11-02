@@ -20,8 +20,8 @@ import java.util.Set;
  *
  * The questions answered about the dataset are as follows:
  * 		What is the average number of queries per user id?													DONE
- *		Report the mean and median query length in both words and characters.
- *		What percentage of queries are mixed case? All upper case? All lower case?
+ *		Report the mean and median query length in both words and characters.								DONE
+ *		What percentage of queries are mixed case? All upper case? All lower case?							DONE
  *		What percent of the time does a user request only the top 10 results?								DONE
  *		What are the 20-most common queries issued?															DONE
  *		What percentage of queries were asked by only one user?												DONE
@@ -259,9 +259,43 @@ public class WebQueryLogAnalysis {
 		System.out.println("Report the mean and median query length in both words and characters.");
 		System.out.println("\twords:\n" + "\t\tmedian: " + wordMedian + "\n\t\tmean: " + wordAverage);
 		System.out.println("\tcharacters:\n" + "\t\tmedian: " + characterMedian + "\n\t\tmean: " + characterAverage);
-
 	}
 
+
+	public void caseStatistics() {
+		int mixedCaseCount = 0;
+		int upperCaseCount = 0;
+		int lowerCaseCount = 0;
+
+		for (List<String> row : data) {
+			String query = row.get(3).trim();
+
+			if (query.toUpperCase().equals(query)) {
+				upperCaseCount++;
+			}
+			else if (query.toLowerCase().equals(query)) {
+				lowerCaseCount++;
+			}
+			else {
+				mixedCaseCount++;
+			}
+		}
+
+		double percentageUpperCase = ((double) upperCaseCount / numQueries) * 100;
+		percentageUpperCase = Math.round(percentageUpperCase * 100.0) / 100.0;
+
+		double percentageLowerCase = ((double) lowerCaseCount / numQueries) * 100;
+		percentageLowerCase = Math.round(percentageLowerCase * 100.0) / 100.0;
+
+		double percentageMixedCase = ((double) mixedCaseCount / numQueries) * 100;
+		percentageMixedCase = Math.round(percentageMixedCase * 100.0) / 100.0;
+
+
+		System.out.println("What percentage of queries are mixed case? All upper case? All lower case?");
+		System.out.println("\tmixed case: " + percentageMixedCase + "%");
+		System.out.println("\tupper case: " + percentageUpperCase + "%");
+		System.out.println("\tlower case: " + percentageLowerCase + "%\n\n");
+	}
 
 
 	public static void main(String[] args) throws IOException {
@@ -274,6 +308,7 @@ public class WebQueryLogAnalysis {
 		//webQueryLogAnalysis.mostCommonQueries();
 		//webQueryLogAnalysis.mostCommonPhrasesInQueries();
 		//webQueryLogAnalysis.frequencyOfURLs();
-		webQueryLogAnalysis.meanAndMedian();
+		//webQueryLogAnalysis.meanAndMedian();
+		webQueryLogAnalysis.caseStatistics();
 	}
 }
