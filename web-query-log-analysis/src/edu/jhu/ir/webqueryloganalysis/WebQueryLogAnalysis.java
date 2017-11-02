@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -18,7 +19,7 @@ import java.util.Set;
  * The dataset is a TSV file containing timestamp, user ID, first rank, and query string
  *
  * The questions answered about the dataset are as follows:
- * 		What is the average number of queries per user id?
+ * 		What is the average number of queries per user id?													DONE
  *		Report the mean and median query length in both words and characters.
  *		What percentage of queries are mixed case? All upper case? All lower case?
  *		What percent of the time does a user request only the top 10 results?								DONE
@@ -206,19 +207,73 @@ public class WebQueryLogAnalysis {
 		System.out.println(queriesWithURLsCount);
 		System.out.println(numQueries);
 		System.out.println("How often do URLs appear in queries?\n\t" + percentageQueriesWithURLs + "% of queries contain URLs\n\n");
+	}
+
+
+	public void meanAndMedian() {
+		List<Integer> characterCounts = new ArrayList<>();
+		List<Integer> wordCounts = new ArrayList<>();
+
+		for (List<String> row : data) {
+			String query = row.get(3).trim();
+			List<String> tokens = IRUtil.tokenize(query);
+			int characters = 0;
+
+			for (String token : tokens) {
+				characters += token.length();
+			}
+
+			characterCounts.add(characters);
+			wordCounts.add(tokens.size());
+		}
+
+		Collections.sort(characterCounts);
+		Collections.sort(wordCounts);
+
+		double characterMedian;
+		if (characterCounts.size() % 2 == 0)
+			characterMedian = ((double)characterCounts.get(characterCounts.size() / 2) + (double)characterCounts.get(characterCounts.size() / 2 - 1))/2;
+		else
+			characterMedian = characterCounts.get(characterCounts.size() / 2);
+
+		double wordMedian;
+		if (wordCounts.size() % 2 == 0)
+			wordMedian = ((double)wordCounts.get(wordCounts.size() / 2) + (double)wordCounts.get(wordCounts.size() / 2 - 1))/2;
+		else
+			wordMedian = wordCounts.get(wordCounts.size() / 2);
+
+
+		double wordAverage = wordCounts
+				.stream()
+				.mapToDouble(a -> a)
+				.average().getAsDouble();
+		wordAverage = Math.round(wordAverage * 100.0) / 100.0;
+
+		double characterAverage = characterCounts
+				.stream()
+				.mapToDouble(a -> a)
+				.average().getAsDouble();
+		characterAverage = Math.round(characterAverage * 100.0) / 100.0;
+
+
+		System.out.println("Report the mean and median query length in both words and characters.");
+		System.out.println("\twords:\n" + "\t\tmedian: " + wordMedian + "\n\t\tmean: " + wordAverage);
+		System.out.println("\tcharacters:\n" + "\t\tmedian: " + characterMedian + "\n\t\tmean: " + characterAverage);
 
 	}
+
 
 
 	public static void main(String[] args) throws IOException {
 		WebQueryLogAnalysis webQueryLogAnalysis = new WebQueryLogAnalysis();
 		webQueryLogAnalysis.readTsvFile();
 
-		webQueryLogAnalysis.averageQueriesPerUserId();
+		//webQueryLogAnalysis.averageQueriesPerUserId();
 		//webQueryLogAnalysis.percentageOfTopTenRequests();
 		//webQueryLogAnalysis.percentageAskedByOneUser();
 		//webQueryLogAnalysis.mostCommonQueries();
 		//webQueryLogAnalysis.mostCommonPhrasesInQueries();
 		//webQueryLogAnalysis.frequencyOfURLs();
+		webQueryLogAnalysis.meanAndMedian();
 	}
 }
