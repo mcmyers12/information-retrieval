@@ -27,10 +27,8 @@ import java.util.Set;
  *		What percentage of queries were asked by only one user?												DONE
  *		Which occurs in queries more often "Al Gore" or "Johns Hopkins"? "Johns Hopkins" or "John Hopkins"?	DONE
  *		How often do URLs appear in queries?																DONE
- *
- *
- *
- *
+ *		What are the 20 most common non-stopwords appearing in queries?										DONE
+ *		What percent of queries contain stopwords like ‘and’, ‘the’, ‘of’, ‘in’, ‘at’?
  *
  * @author Miranda Myers
  *
@@ -39,6 +37,7 @@ public class WebQueryLogAnalysis {
 
 	private List<List<String>> data = new ArrayList<>();
 	private int numQueries;
+
 
 	public void readTsvFile() throws IOException {
 		BufferedReader tsvFile = new BufferedReader(new FileReader("19991220-Excite-QueryLog.utf8.tsv"));
@@ -150,6 +149,38 @@ public class WebQueryLogAnalysis {
 		while(it.hasNext() && count <= 20) {
 			String query = it.next().getKey();
 			System.out.println("\t" + count + ". " + query + " (" + sortedQueryCounts.get(query) + " times)");
+			count++;
+		}
+		System.out.println("\n\n");
+	}
+
+
+	public void mostCommonNonStopwords() {
+		System.out.println("What are the 20 most common non-stopwords appearing in queries?");
+
+		Map<String, Integer> nonStopwordCounts = new HashMap<>();
+		for (List<String> row : data) {
+			String query = row.get(3).trim();
+
+			for (String token : IRUtil.tokenize(query)) {
+				if (!IRUtil.isStopword(token)) {
+					if (nonStopwordCounts.containsKey(token)) {
+						int count = nonStopwordCounts.get(token);
+						nonStopwordCounts.put(token, ++count);
+					}
+					else {
+						nonStopwordCounts.put(token, 1);
+					}
+				}
+			}
+		}
+
+		Map<String, Integer> sortedNonStopwordCounts = IRUtil.sortMapByValueDescending(nonStopwordCounts);
+		Iterator<Entry<String, Integer>> it = sortedNonStopwordCounts.entrySet().iterator();
+		int count = 1;
+		while(it.hasNext() && count <= 20) {
+			String term = it.next().getKey();
+			System.out.println("\t" + count + ". " + term + " (" + sortedNonStopwordCounts.get(term) + " times)");
 			count++;
 		}
 		System.out.println("\n\n");
@@ -309,6 +340,7 @@ public class WebQueryLogAnalysis {
 		//webQueryLogAnalysis.mostCommonPhrasesInQueries();
 		//webQueryLogAnalysis.frequencyOfURLs();
 		//webQueryLogAnalysis.meanAndMedian();
-		webQueryLogAnalysis.caseStatistics();
+		//webQueryLogAnalysis.caseStatistics();
+		webQueryLogAnalysis.mostCommonNonStopwords();;
 	}
 }
