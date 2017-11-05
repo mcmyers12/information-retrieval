@@ -128,6 +128,16 @@ public class IRUtil {
 	}
 
 
+	public static boolean queryContainsStopword(String query) {
+		for (String token : IRUtil.tokenize(query)) {
+			if (isStopword(token)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+
 	/**
 	 * Determine whether a term is a stopword
 	 * @param term

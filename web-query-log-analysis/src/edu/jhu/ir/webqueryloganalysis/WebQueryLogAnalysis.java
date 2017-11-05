@@ -19,15 +19,15 @@ import java.util.Set;
  * The dataset is a TSV file containing timestamp, user ID, first rank, and query string
  *
  * The questions answered about the dataset are as follows:
- * 		What is the average number of queries per user id?													DONE
- *		Report the mean and median query length in both words and characters.								DONE
- *		What percentage of queries are mixed case? All upper case? All lower case?							DONE
- *		What percent of the time does a user request only the top 10 results?								DONE
- *		What are the 20-most common queries issued?															DONE
- *		What percentage of queries were asked by only one user?												DONE
- *		Which occurs in queries more often "Al Gore" or "Johns Hopkins"? "Johns Hopkins" or "John Hopkins"?	DONE
- *		How often do URLs appear in queries?																DONE
- *		What are the 20 most common non-stopwords appearing in queries?										DONE
+ * 		What is the average number of queries per user id?
+ *		Report the mean and median query length in both words and characters.
+ *		What percentage of queries are mixed case? All upper case? All lower case?
+ *		What percent of the time does a user request only the top 10 results?
+ *		What are the 20-most common queries issued?
+ *		What percentage of queries were asked by only one user?
+ *		Which occurs in queries more often "Al Gore" or "Johns Hopkins"? "Johns Hopkins" or "John Hopkins"?
+ *		How often do URLs appear in queries?
+ *		What are the 20 most common non-stopwords appearing in queries?
  *		What percent of queries contain stopwords like ‘and’, ‘the’, ‘of’, ‘in’, ‘at’?
  *
  * @author Miranda Myers
@@ -151,7 +151,7 @@ public class WebQueryLogAnalysis {
 			System.out.println("\t" + count + ". " + query + " (" + sortedQueryCounts.get(query) + " times)");
 			count++;
 		}
-		System.out.println("\n\n");
+		System.out.println("\n");
 	}
 
 
@@ -183,7 +183,22 @@ public class WebQueryLogAnalysis {
 			System.out.println("\t" + count + ". " + term + " (" + sortedNonStopwordCounts.get(term) + " times)");
 			count++;
 		}
-		System.out.println("\n\n");
+		System.out.println("\n");
+	}
+
+
+	public void queriesWithStopwords() {
+		int queriesWithStopwords = 0;
+		for (List<String> row : data) {
+			String query = row.get(3).trim();
+			if (IRUtil.queryContainsStopword(query)) {
+				queriesWithStopwords++;
+			}
+		}
+
+		double percentageQueriesWithStopwords = ((double) queriesWithStopwords / numQueries) * 100;
+		percentageQueriesWithStopwords = Math.round(percentageQueriesWithStopwords * 100.0) / 100.0;
+		System.out.println("What percent of queries contain stopwords like ‘and’, ‘the’, ‘of’, ‘in’, ‘at’?\n\t" + percentageQueriesWithStopwords + "%\n\n");
 	}
 
 
@@ -210,14 +225,9 @@ public class WebQueryLogAnalysis {
 		}
 
 		Map<String, Integer> sortedTermCounts = IRUtil.sortMapByValueDescending(termCounts);
-
-		for (Map.Entry<String, Integer> entry : sortedTermCounts.entrySet()) {
-			System.out.println(entry.getKey() + " " + entry.getValue());
-		}
-
 		String mostCommon = sortedTermCounts.entrySet().iterator().next().getKey();
 
-		System.out.println("Which occurs in queries more often \"Al Gore\" or \"Johns Hopkins?\" \"Johns Hopkins\" or \"John Hopkins\"?\n\t" + mostCommon);
+		System.out.println("Which occurs in queries more often \"Al Gore\" or \"Johns Hopkins?\" \"Johns Hopkins\" or \"John Hopkins\"?\n\t" + mostCommon + "\n\n");
 	}
 
 
@@ -235,8 +245,6 @@ public class WebQueryLogAnalysis {
 		double percentageQueriesWithURLs = ((double) queriesWithURLsCount / numQueries) * 100;
 		percentageQueriesWithURLs = Math.round(percentageQueriesWithURLs * 100.0) / 100.0;
 
-		System.out.println(queriesWithURLsCount);
-		System.out.println(numQueries);
 		System.out.println("How often do URLs appear in queries?\n\t" + percentageQueriesWithURLs + "% of queries contain URLs\n\n");
 	}
 
@@ -289,7 +297,7 @@ public class WebQueryLogAnalysis {
 
 		System.out.println("Report the mean and median query length in both words and characters.");
 		System.out.println("\twords:\n" + "\t\tmedian: " + wordMedian + "\n\t\tmean: " + wordAverage);
-		System.out.println("\tcharacters:\n" + "\t\tmedian: " + characterMedian + "\n\t\tmean: " + characterAverage);
+		System.out.println("\tcharacters:\n" + "\t\tmedian: " + characterMedian + "\n\t\tmean: " + characterAverage + "\n\n");
 	}
 
 
@@ -333,14 +341,15 @@ public class WebQueryLogAnalysis {
 		WebQueryLogAnalysis webQueryLogAnalysis = new WebQueryLogAnalysis();
 		webQueryLogAnalysis.readTsvFile();
 
-		//webQueryLogAnalysis.averageQueriesPerUserId();
-		//webQueryLogAnalysis.percentageOfTopTenRequests();
-		//webQueryLogAnalysis.percentageAskedByOneUser();
-		//webQueryLogAnalysis.mostCommonQueries();
-		//webQueryLogAnalysis.mostCommonPhrasesInQueries();
-		//webQueryLogAnalysis.frequencyOfURLs();
-		//webQueryLogAnalysis.meanAndMedian();
-		//webQueryLogAnalysis.caseStatistics();
-		webQueryLogAnalysis.mostCommonNonStopwords();;
+		webQueryLogAnalysis.averageQueriesPerUserId();
+		webQueryLogAnalysis.percentageOfTopTenRequests();
+		webQueryLogAnalysis.percentageAskedByOneUser();
+		webQueryLogAnalysis.mostCommonQueries();
+		webQueryLogAnalysis.mostCommonPhrasesInQueries();
+		webQueryLogAnalysis.frequencyOfURLs();
+		webQueryLogAnalysis.meanAndMedian();
+		webQueryLogAnalysis.caseStatistics();
+		webQueryLogAnalysis.mostCommonNonStopwords();
+		webQueryLogAnalysis.queriesWithStopwords();
 	}
 }
