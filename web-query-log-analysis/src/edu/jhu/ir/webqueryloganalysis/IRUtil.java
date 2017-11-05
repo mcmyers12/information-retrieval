@@ -94,6 +94,34 @@ public class IRUtil {
 
 
 	/**
+	 * Check whether a query contains query syntax
+	 * @param query
+	 * @return
+	 */
+	public static boolean containsQuerySyntax(String query) {
+		if (query.contains("+") || query.contains("-") || query.contains("\"") || query.contains("*")) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check whether a string is a website:
+	 * 		Is a valid URL, starts with www, or ends with .com
+	 * @param string
+	 * @return
+	 */
+	public static boolean isWebsite(String string) {
+		if (isValidURL(string) || (string.startsWith("www") && !string.equals("www") && !string.equals("www.")) || (string.endsWith(".com")  && !string.equals(".com"))) {
+			return true;
+		}
+
+		return false;
+	}
+
+
+	/**
 	 * Determine whether a given string is a valid URL
 	 * @param urlString
 	 * @return
@@ -128,6 +156,11 @@ public class IRUtil {
 	}
 
 
+	/**
+	 * Check whether a query contains a stopword
+	 * @param query
+	 * @return
+	 */
 	public static boolean queryContainsStopword(String query) {
 		for (String token : IRUtil.tokenize(query)) {
 			if (isStopword(token)) {

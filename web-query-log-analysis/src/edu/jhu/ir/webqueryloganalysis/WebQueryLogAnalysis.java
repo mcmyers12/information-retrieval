@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -29,6 +30,10 @@ import java.util.Set;
  *		How often do URLs appear in queries?
  *		What are the 20 most common non-stopwords appearing in queries?
  *		What percent of queries contain stopwords like ‘and’, ‘the’, ‘of’, ‘in’, ‘at’?
+ *
+ *		What are the most popular websites mentioned in the queries?
+ *		How does query volume change throughout the day?
+ * 		How often is search engine “query” syntax used, like phrases in quotes, Boolean operators, or ‘+’ or ‘-‘ signs?
  *
  * @author Miranda Myers
  *
@@ -57,6 +62,47 @@ public class WebQueryLogAnalysis {
 
 		tsvFile.close();
 		numQueries = data.size();
+	}
+
+
+	public void queryVolume() {
+		Map<String, Integer> hourCounts = new LinkedHashMap<>();
+
+		for (List<String> row : data) {
+			String hour = row.get(0).trim().substring(0, 2);
+
+			if (hourCounts.containsKey(hour)) {
+				int count = hourCounts.get(hour);
+				hourCounts.put(hour, ++count);
+			}
+			else {
+				hourCounts.put(hour, 1);
+			}
+		}
+
+		System.out.println("How does query volume change throughout the day?\n\thour\tnum queries");
+
+		for (Map.Entry<String, Integer> entry: hourCounts.entrySet()) {
+			System.out.println("\t" + entry.getKey() + "\t" + entry.getValue());
+		}
+		System.out.println("\n");
+	}
+
+
+	public void frequencyOfQuerySyntax() {
+		int querySyntaxCount = 0;
+
+		for (List<String> row : data) {
+			String query = row.get(3).trim();
+			if (IRUtil.containsQuerySyntax(query)) {
+				querySyntaxCount++;
+			}
+		}
+
+		double percentageQuerySyntax = ((double) querySyntaxCount / numQueries) * 100;
+		percentageQuerySyntax = Math.round(percentageQuerySyntax * 100.0) / 100.0;
+
+		System.out.println("How often is search engine “query” syntax used, like phrases in quotes, Boolean operators, or ‘+’ or ‘-‘ signs?\n\t" + "Query syntax is used " + percentageQuerySyntax + "% of the time\n\n");
 	}
 
 	public void averageQueriesPerUserId() {
@@ -231,6 +277,38 @@ public class WebQueryLogAnalysis {
 	}
 
 
+	public void mostCommonWebsites() {
+		System.out.println("What are the most popular websites mentioned in the queries?");
+
+		Map<String, Integer> websiteCounts = new HashMap<>();
+		for (List<String> row : data) {
+			String query = row.get(3).trim();
+
+			for (String token : IRUtil.tokenize(query)) {
+				if (IRUtil.isWebsite(token)) {
+					if (websiteCounts.containsKey(token)) {
+						int count = websiteCounts.get(token);
+						websiteCounts.put(token, ++count);
+					}
+					else {
+						websiteCounts.put(token, 1);
+					}
+				}
+			}
+		}
+
+		Map<String, Integer> sortedWebsiteCounts = IRUtil.sortMapByValueDescending(websiteCounts);
+		Iterator<Entry<String, Integer>> it = sortedWebsiteCounts.entrySet().iterator();
+		int count = 1;
+		while(it.hasNext() && count <= 20) {
+			String term = it.next().getKey();
+			System.out.println("\t" + count + ". " + term + " (" + sortedWebsiteCounts.get(term) + " times)");
+			count++;
+		}
+		System.out.println("\n");
+	}
+
+
 	public void frequencyOfURLs() {
 		int queriesWithURLsCount = 0;
 
@@ -351,5 +429,8 @@ public class WebQueryLogAnalysis {
 		webQueryLogAnalysis.caseStatistics();
 		webQueryLogAnalysis.mostCommonNonStopwords();
 		webQueryLogAnalysis.queriesWithStopwords();
+		webQueryLogAnalysis.mostCommonWebsites();
+		webQueryLogAnalysis.frequencyOfQuerySyntax();
+		webQueryLogAnalysis.queryVolume();
 	}
 }
